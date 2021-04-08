@@ -1,0 +1,97 @@
+.upperStuff 
+{
+    display: flex;
+    padding: 10px;
+    text-align: center;
+}
+
+.containerLeft
+{
+    height: 400px;
+    position: relative;
+    border: 3px solid green; 
+    width: 160px;
+    margin: 10px;
+    text-align: left;
+}
+
+.containerMidLeft
+{
+    height: auto;
+    position: relative;
+    border: 3px solid red;
+    width: auto;
+    margin: 10px;
+}
+
+.containerMidRight
+{
+    height: 400px;
+    position: static;
+    border: 3px solid rgb(0, 4, 255);
+    width: 160px;
+    margin: 10px;
+}
+
+.containerPlayerOne
+{
+    height: 400px;
+    position: auto;
+    border: 3px solid rgb(229, 255, 0);
+    width: auto;
+    margin: 10px;
+}
+
+.containerPlayerTwo
+{
+    height: 400px;
+    position: auto;
+    border: 3px solid rgb(229, 255, 0);
+    width: auto;
+    margin: 10px;
+}
+
+
+#punkteTabelle
+{
+    border: 1px solid black;
+    table-layout: auto;
+    border-collapse: separate;
+}
+
+#punkteTabelle td
+{
+    border: 2px solid rgb(52, 30, 153);
+    table-layout: auto;
+    border-collapse: separate;
+}
+
+img
+{
+    width:50px;
+    height: 50px;
+    top: 50%;
+    left: 30%;
+    position: relative;
+}
+
+img.noHold
+{
+}
+
+img.hold
+{
+    filter: invert(0.20);
+    border: 1px solid red;
+}
+
+img.locked
+{
+    border: 1px solid turquoise;
+    filter:invert(1);
+}
+
+div img:hover
+{
+filter:invert(0.16)
+}
