@@ -3,6 +3,7 @@ const app = express();
 const http = require('http');
 const server = http.createServer(app);
 const io = require('socket.io')(server);
+const activeUsers = new Object();
 
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
@@ -17,15 +18,28 @@ io.on('connection', (socket) => {
 
 io.on('connection', (socket) => {
   socket.on('isTyping', (msg) => {
-    let nachricht = msg["nickname"] + " ist am schreiben...";
+    let nachricht = activeUsers[socket.id] + " ist am schreiben...";
     socket.broadcast.emit('chat', {"typing": true, "message": nachricht});
   });
 });
 
 io.on('connection', (socket) => {
   socket.on('chat', (msg) => {
-    let nachricht = msg["nickname"] + ": " + msg["input"];
-    io.emit('chat', {"typing": false, "nickname": msg["nickname"], "message": nachricht});
+    let nachricht = activeUsers[socket.id] + ": " + msg["input"];
+    io.emit('chat', {"typing": false, "message": nachricht, "nickname": activeUsers[socket.id]});
+  });
+});
+
+io.on('connection', (socket) => {
+  socket.on('onlineUser', (msg) => {
+    activeUsers[socket.id] = msg["nickname"];
+    let userlist = [];
+    for(let k in activeUsers)
+    {
+      userlist.push(activeUsers[k]);
+    }
+    console.log(userlist);
+    io.emit('onlineUser', userlist)
   });
 });
 
