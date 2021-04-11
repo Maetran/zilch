@@ -12,7 +12,16 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
   socket.broadcast.emit('chat', {"message": "Teilnehmer hat den Chat betreten"});
   socket.on('disconnect', () => {
-    socket.broadcast.emit('chat', {"message": "Teilnehmer hat den Chat verlassen"});
+    let thisUser = activeUsers[socket.id];
+    let nachricht = thisUser + " hat den Chat verlassen";
+    socket.broadcast.emit('chat', {"message": nachricht});
+    delete activeUsers[socket.id];
+    let userlist = [];
+    for(let k in activeUsers)
+    {
+      userlist.push(activeUsers[k]);
+    };
+    io.emit('onlineUser', userlist)
   });
 });
 
