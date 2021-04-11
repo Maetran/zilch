@@ -25,6 +25,9 @@
         <input id="name" autocomplete="off"></input>
         <input id="input" autocomplete="off" /><button>Send</button>
     </form>
+    <p>
+      <div>Aktuell Online: <span id="onlineUser">Der da</span></div>
+    </p>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         let socket = io();
@@ -41,9 +44,9 @@
             e.preventDefault();
             if(input.value)
             {
-                socket.emit("chat", {"nickname":name.value, "input": input.value});
+                socket.emit("chat", {"input": input.value});
                 input.value="";
-                
+
             }
         });
 
@@ -54,7 +57,7 @@
             console.log("im listener für typing");
             if(input.value.length==1)
             {
-                socket.emit("isTyping", {"nickname":name.value});
+                socket.emit("isTyping");
             }
         });
 
@@ -69,9 +72,9 @@
             {
                 let typing = ($(".typing"))
                 let typingClasses = Array.from(typing);
-                console.log(typingClasses);
                 for(let i=typingClasses.length-1;i>=0;i--)
                 {
+                    console.log(msg["nickname"]);
                     if(typingClasses[i].innerHTML.includes(msg["nickname"]))
                     {
                         typing[i].remove();
@@ -80,6 +83,16 @@
             };
             messages.appendChild(item);
             window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        // UPDATE NICKNAME ON SERVER AND SHOW WHO IS ONLINE
+
+        $("#name").on("input", () => {
+          socket.emit('onlineUser', {"nickname": name.value});
+        });
+
+        socket.on('onlineUser', (msg) => {
+          $("#onlineUser").text(msg);
         });
 
     </script>
