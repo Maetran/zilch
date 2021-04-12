@@ -6,6 +6,14 @@
         <link rel="stylesheet" href="./zilch.css">
     </head>
     <body>
+      <script src="/socket.io/socket.io.js"></script>
+      <script>
+        let socket = io();
+      </script>
+        <div class="topLane">
+          <form id="userName" action="">Spielername</form>
+            <input id="playerName">&nbsp;</input><button>Bestätigen</button>
+        </div>
         <div class="upperStuff">
             <div class="containerLeft">
                 <div id="diceContainer" class="allDice">
@@ -48,6 +56,9 @@
             </div>
         </div>
     </body>
+    <script>
+
+    </script>
     <!-- <script> // Eventlistener
         const gameValues = init();                           // creates gameValues and makes them accessable global
         rollUnholdDice(1);                                  // roll all dice onload and define random values
