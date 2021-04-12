@@ -1,0 +1,59 @@
+<!DOCTYPE html><html>
+    <head>
+        <meta charset="utf-8">
+        <title>Zilch-The Game</title>
+        <script src=""></script>
+        <link rel="stylesheet" href="./zilch.css">
+    </head>
+    <body>
+        <div class="upperStuff">
+            <div class="containerLeft">
+                <div id="diceContainer" class="allDice">
+                    <img id="wuerfelEins" src="one.png" alt="wuerfel1"><br>
+                    <img id="wuerfelZwei" src="two.png" alt="wuerfel2"><br>
+                    <img id="wuerfelDrei" src="three.png" alt="wuerfel3"><br>
+                    <img id="wuerfelVier" src="four.png" alt="wuerfel4"><br>
+                    <img id="wuerfelFuenf" src="five.png" alt="wuerfel5"><br>
+                    <img id="wuerfelSechs" src="six.png" alt="wuerfel6">
+                </div>
+            </div>
+            <div class="containerMidLeft">
+                <input id="knopf1" type="button" value="Würfeln"><br><br>
+                <input id="knopf2" type="button" value="Anschreiben"><br><br>
+                <input id="knopf3" type="button" value="Zilch"><br><br>
+                <p id="sondertext">&NonBreakingSpace;</p>
+            </div>
+            <div class="containerMidRight">
+                <p><span id="spielerName1">Name</span> hat in diesem Durchgang <br><b id="punkteAnzeige">0</b><br>Punkte gewürfelt.</p>
+            </div>
+            <div class="containerPlayerOne">
+                <p id="namePlayer1">Spieler 1</p>
+                <table id="punkteTabelle0">
+                    <tr>
+                        <th>Durchgang</th>
+                        <th>Neue Punkte dazu</th>
+                        <th>Total Punkte</th>
+                    </tr>
+                </table>
+            </div>
+            <div class="containerPlayerOne">
+                <p id="namePlayer2">Spieler 2</p>
+                <table id="punkteTabelle1">
+                    <tr>
+                        <th>Durchgang</th>
+                        <th>Neue Punkte dazu</th>
+                        <th>Total Punkte</th>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </body>
+    <!-- <script> // Eventlistener
+        const gameValues = init();                           // creates gameValues and makes them accessable global
+        rollUnholdDice(1);                                  // roll all dice onload and define random values
+        const wuerfelIDs = getWuerfelIDs();
+        registerHoldListener();                             // creates listener for click on dice to hold / unhold
+        registerButtonListerner();                          // creates listener for buttons in UI
+        registerCounterListener();                          // creates listener for analyze of points after each hold
+    </script> -->
+</html>
