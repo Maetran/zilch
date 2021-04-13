@@ -2,14 +2,15 @@
     <head>
         <meta charset="utf-8">
         <title>Zilch-The Game</title>
-        <script src=""></script>
         <link rel="stylesheet" href="./zilch.css">
+        <script src="/socket.io/socket.io.js"></script>
+        <script src="/jquery-3.6.0.min.js"></script>
+        <script src="/zilch.js"></script>
+        <script>
+        let socket = io();
+        </script>
     </head>
     <body>
-      <script src="/socket.io/socket.io.js"></script>
-      <script>
-        let socket = io();
-      </script>
       <div id="nameDiv" class="topLine">
         <form id="nameForm">
           <input id="nameInput" autocomplete="off" /><button>Name übermitteln</button>
@@ -55,17 +56,35 @@
                     </tr>
                 </table>
             </div>
+            <div class="playerList">
+              <p id="allPlayer">Spieler Online:</p>
+              <table id="playerOnlineList">
+                <tr>
+                  <th>Name</th>
+                  <th>Socket ID</th>
+                </tr>
+              </table>
         </div>
     </body>
 
-    // Eventlistener
+    <!-- Eventlistener -->
+
+    <!-- // Submit Username & get back Playerlist -->
     <script>
-      $('#nameInput').on('submit', (e) => {
+      $('#nameForm').on('submit', (e) => {
         e.preventDefault();
-        let name = $(#'nameInput').value;
+        let name = document.getElementById('nameInput').value;
         if(name!="") {
           socket.emit('registerPlayer', name);
-          $("#nameForm").setAttribute("hidden", true);
+          $('#nameForm').attr('hidden', true);
+        };
+      });
+
+      socket.on('updatePlayerList', (msg) => {
+        $('#playerOnlineList').html('<tr><th>Name</th><th>Socket ID</td></tr>');
+        for(k in msg)
+        {
+          $('#playerOnlineList tr:last').after('<tr><td>'+msg[k]+'</td><td>'+k);
         };
       });
     </script>
