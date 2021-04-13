@@ -10,10 +10,11 @@
       <script>
         let socket = io();
       </script>
-        <div class="topLane">
-          <form id="userName" action="">Spielername</form>
-            <input id="playerName">&nbsp;</input><button>Bestätigen</button>
-        </div>
+      <div id="nameDiv" class="topLine">
+        <form id="nameForm">
+          <input id="nameInput" autocomplete="off" /><button>Name übermitteln</button>
+        </form>
+      </div>
         <div class="upperStuff">
             <div class="containerLeft">
                 <div id="diceContainer" class="allDice">
@@ -56,15 +57,16 @@
             </div>
         </div>
     </body>
-    <script>
 
+    // Eventlistener
+    <script>
+      $('#nameInput').on('submit', (e) => {
+        e.preventDefault();
+        let name = $(#'nameInput').value;
+        if(name!="") {
+          socket.emit('registerPlayer', name);
+          $("#nameForm").setAttribute("hidden", true);
+        };
+      });
     </script>
-    <!-- <script> // Eventlistener
-        const gameValues = init();                           // creates gameValues and makes them accessable global
-        rollUnholdDice(1);                                  // roll all dice onload and define random values
-        const wuerfelIDs = getWuerfelIDs();
-        registerHoldListener();                             // creates listener for click on dice to hold / unhold
-        registerButtonListerner();                          // creates listener for buttons in UI
-        registerCounterListener();                          // creates listener for analyze of points after each hold
-    </script> -->
 </html>
