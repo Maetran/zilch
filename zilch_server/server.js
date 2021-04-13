@@ -24,7 +24,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// Delete user at disconnect from userlist
+// Delete user from userlist at disconnect 
 io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('User verlassen: ' + allUsers[socket.id])
