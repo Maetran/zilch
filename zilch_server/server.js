@@ -12,8 +12,12 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/zilch.html');
 });
 
-io.on('registerPlayer', (msg) => {
-  
+io.on('connection', (socket) => {
+  socket.on('registerPlayer', (msg) => {
+    let playerSocketId = socket.id;
+    let playerName = msg;
+    allUsers[playerSocketId] = playerName;
+  })
 })
 
 server.listen(3003, () => {
