@@ -1,4 +1,4 @@
-.upperStuff 
+.upperStuff
 {
     display: flex;
     padding: 10px;
@@ -51,6 +51,14 @@
     margin: 10px;
 }
 
+.playerList
+{
+  height: 400px;
+  position: auto;
+  border: 3px solid rgb(20, 20, 0);
+  width: auto;
+  margin: 10px;
+}
 
 #punkteTabelle
 {
