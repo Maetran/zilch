@@ -103,3 +103,7 @@ div img:hover
 {
 filter:invert(0.16)
 }
+
+.page {
+    height: 100vh;
+}
