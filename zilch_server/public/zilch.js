@@ -409,4 +409,41 @@ function bank()
             zilch();
         }
     }
-}
+};
+
+// Sockets
+
+let socket = io();
+
+$('#nameForm').on('submit', (e) => {
+  e.preventDefault();
+  let name = document.getElementById('nameInput').value;
+  if(name!="") {
+    socket.emit('registerPlayer', name);
+    $('#nameForm').attr('hidden', true);
+  };
+});
+
+socket.on('updatePlayerList', (msg) => {
+  $('#playerOnlineList').html('<tr><th>Name</th><th>Socket ID</td></tr>');
+  for(k in msg)
+  {
+    $('#playerOnlineList tr:last').after('<tr><td>'+msg[k]+'</td><td>'+k);
+  };
+});
+
+socket.on('joinedGame', (gameId) => {
+  console.log("Du bist jetzt im Raum: " + gameId);
+});
+
+socket.on('leftGame', )
+
+function createGame()
+{
+  socket.emit('createNewGame')
+};
+
+function leaveGame()
+{
+  socket.emit('leaveGame')
+};
