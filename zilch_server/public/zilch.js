@@ -420,7 +420,6 @@ $('#nameForm').on('submit', (e) => {
   let name = document.getElementById('nameInput').value;
   if(name!="") {
     socket.emit('registerPlayer', name);
-    $('#nameForm').attr('hidden', true);
   };
 });
 
@@ -430,20 +429,54 @@ socket.on('updatePlayerList', (msg) => {
   {
     $('#playerOnlineList tr:last').after('<tr><td>'+msg[k]+'</td><td>'+k);
   };
+  location.hash = 'lobby';
 });
 
 socket.on('joinedGame', (gameId) => {
-  console.log("Du bist jetzt im Raum: " + gameId);
+  console.log("Du bist jetzt im Raum: " + gameId["gameId"] + " " + gameId["name"]);
+  location.hash = 'game';
 });
 
-socket.on('leftGame', )
+socket.on('newGameAvailable', (gameParams) => {
+  const newGameButton = document.createElement('button');
+  newGameButton.innerHTML = gameParams["name"];
+  newGameButton.setAttribute('onclick', 'joinThisGame(' + gameParams["gameId"] + ')');
+  $('#availableGames').append(newGameButton);
+});
+
+socket.on('leftGame', () => {
+  console.log("Du hast das Spiel verlassen, zurück zur Lobby");
+  location.hash = 'lobby';
+});
+
+socket.on('showAllGames', (activeGames) => {
+  console.log("aktive spiele: " + activeGames);
+  for(k in activeGames)
+  {
+    const newGameButton = document.createElement('button');
+    newGameButton.innerHTML = activeGames[k];
+    newGameButton.setAttribute('onclick', 'joinThisGame("' + k + '")');
+    $('#availableGames').append(newGameButton);
+  };
+});
 
 function createGame()
 {
-  socket.emit('createNewGame')
+  const userGameName = prompt("Gib deinem Spiel einen Namen:");
+  socket.emit('createNewGame', userGameName);
 };
 
 function leaveGame()
 {
-  socket.emit('leaveGame')
+  socket.emit('leaveGame');
 };
+
+function joinThisGame(gameId)
+{
+  const newLeaveButton = document.createElement('button');
+  newLeaveButton.innerHTML = "Dieses Spiel beenden";
+  newLeaveButton.setAttribute('onclick', 'leaveGame("' + gameId + '")');
+  $('#leaveGameButton').append(newLeaveButton);
+}
+
+location.hash = '';

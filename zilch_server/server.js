@@ -21,17 +21,23 @@ io.on('connection', (socket) => {
     console.log("User verbunden: " + msg);
     allUsers[socket.id] = msg;
     console.log(allUsers);
-    io.emit('updatePlayerList', allUsers)
+    io.emit('updatePlayerList', allUsers);
+    socket.emit('showAllGames', activeGames);
   });
   // Create new Game
-  socket.on('createNewGame', () => {
+  socket.on('createNewGame', (userGameName) => {
     const gameId = "game" + socket.id;
     socket.join(gameId);
-    socket.emit('joinedGame', gameId)
+    const gameParams = {"gameId": gameId, "name": userGameName};
+    socket.emit('joinedGame', gameParams);
+    io.emit('newGameAvailable', gameParams);
+    activeGames[gameId] = userGameName;
+    console.log("Alle Aktiven Spiele: "  + activeGames)
   });
   // Leave current Game
-  socket.on('leaveGame', () => {
-    socket.emit('leftGame');
+  socket.on('leaveGame', (gameId) => {
+    socket.leave(gameId);
+    socket.to(gameId).emit('leftGame');
   })
 });
 
@@ -41,8 +47,8 @@ io.on('connection', (socket) => {
     console.log('User verlassen: ' + allUsers[socket.id])
     delete allUsers[socket.id];
     io.emit('updatePlayerList', allUsers);
-  })
-})
+  });
+});
 
 // Server port
 server.listen(3003, () => {
