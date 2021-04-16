@@ -435,12 +435,17 @@ socket.on('updatePlayerList', (msg) => {
 socket.on('joinedGame', (gameId) => {
   console.log("Du bist jetzt im Raum: " + gameId["gameId"] + " " + gameId["name"]);
   location.hash = 'game';
+  const newLeaveButton = document.createElement('button');
+  newLeaveButton.innerHTML = "Dieses Spiel beenden";
+  newLeaveButton.setAttribute('onclick', 'leaveGame(' + gameId + ')');
+  $('#leaveGameButton').append(newLeaveButton);
 });
 
 socket.on('newGameAvailable', (gameParams) => {
   const newGameButton = document.createElement('button');
   newGameButton.innerHTML = gameParams["name"];
-  newGameButton.setAttribute('onclick', 'joinThisGame(' + gameParams["gameId"] + ')');
+  newGameButton.setAttribute('onclick', 'joinThisGame("' + gameParams["gameId"] + '")');
+  newGameButton.setAttribute('id', gameParams["gameId"]);
   $('#availableGames').append(newGameButton);
 });
 
@@ -450,15 +455,18 @@ socket.on('leftGame', () => {
 });
 
 socket.on('showAllGames', (activeGames) => {
-  console.log("aktive spiele: " + activeGames);
   for(k in activeGames)
   {
     const newGameButton = document.createElement('button');
-    newGameButton.innerHTML = activeGames[k];
-    newGameButton.setAttribute('onclick', 'joinThisGame("' + k + '")');
+    console.log(activeGames.k + " " + activeGames[k]);
+    newGameButton.setAttribute('onclick', 'joinThisGame("' + activegames.k + '")');
+    newGameButton.setAttribute('id', k);
+    newGameButton.innerHTML = activeGames[k][0];
     $('#availableGames').append(newGameButton);
   };
 });
+
+
 
 function createGame()
 {
@@ -477,6 +485,14 @@ function joinThisGame(gameId)
   newLeaveButton.innerHTML = "Dieses Spiel beenden";
   newLeaveButton.setAttribute('onclick', 'leaveGame("' + gameId + '")');
   $('#leaveGameButton').append(newLeaveButton);
-}
+  const buttonText = $('#'+gameId).text();
+  const submit = {"gameId":gameId, "buttonText":buttonText};
+  console.log(buttonText);
+  socket.emit('gameFull', submit);
+};
+
+socket.on('gameNowFull', (gameId) => {
+  $('#'+gameId).remove();
+});
 
 location.hash = '';

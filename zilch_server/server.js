@@ -17,10 +17,8 @@ app.get('/', (req, res) => {
 // First connect and adding user to allUsers - Object; send back Userlist to io
 io.on('connection', (socket) => {
   // Register new Player to allUsers
-  socket.on('registerPlayer', (msg) => {
-    console.log("User verbunden: " + msg);
-    allUsers[socket.id] = msg;
-    console.log(allUsers);
+  socket.on('registerPlayer', (user) => {
+    allUsers[socket.id] = user;
     io.emit('updatePlayerList', allUsers);
     socket.emit('showAllGames', activeGames);
   });
@@ -31,18 +29,27 @@ io.on('connection', (socket) => {
     const gameParams = {"gameId": gameId, "name": userGameName};
     socket.emit('joinedGame', gameParams);
     io.emit('newGameAvailable', gameParams);
-    activeGames[gameId] = userGameName;
-    console.log("Alle Aktiven Spiele: "  + activeGames)
+    activeGames[gameId] = [userGameName,[socket.id]];
+    console.log("im Spiel "  + gameId + ": "+ activeGames[gameId][1]);
   });
   // Leave current Game
   socket.on('leaveGame', (gameId) => {
     socket.leave(gameId);
     socket.to(gameId).emit('leftGame');
-  })
-});
+  });
+  // Mark game as full (opened Game got 2nd Player)
+  socket.on('gameFull', (submit) => {
+    const gameName = submit["buttonText"];
+    const gameId = submit["gameId"];
+    activeGames[gameId][1] += socket.id;
+    console.log("im Spiel "  + gameId + ": "+ activeGames[gameId][1]);
+    io.emit('gameNowFull', gameId);
+    delete activeGames[gameId];
+  });
 
-// Delete user from userlist at disconnect
-io.on('connection', (socket) => {
+  // activeGames = {"gameId":["buttonText",[player1, player2]]}
+
+  // update list after player leaves
   socket.on('disconnect', () => {
     console.log('User verlassen: ' + allUsers[socket.id])
     delete allUsers[socket.id];
