@@ -455,11 +455,11 @@ socket.on('leftGame', () => {
 });
 
 socket.on('showAllGames', (activeGames) => {
+  $('#availableGames').empty();
   for(k in activeGames)
   {
     const newGameButton = document.createElement('button');
-    console.log(activeGames.k + " " + activeGames[k]);
-    newGameButton.setAttribute('onclick', 'joinThisGame("' + activegames.k + '")');
+    newGameButton.setAttribute('onclick', 'joinThisGame("' + activeGames[k] + '")');
     newGameButton.setAttribute('id', k);
     newGameButton.innerHTML = activeGames[k][0];
     $('#availableGames').append(newGameButton);
@@ -487,12 +487,15 @@ function joinThisGame(gameId)
   $('#leaveGameButton').append(newLeaveButton);
   const buttonText = $('#'+gameId).text();
   const submit = {"gameId":gameId, "buttonText":buttonText};
-  console.log(buttonText);
   socket.emit('gameFull', submit);
 };
 
 socket.on('gameNowFull', (gameId) => {
   $('#'+gameId).remove();
 });
+
+socket.on('gameStart', () => {
+  alert("Dein Spiel startet");
+})
 
 location.hash = '';

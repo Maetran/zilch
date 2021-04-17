@@ -41,9 +41,12 @@ io.on('connection', (socket) => {
   socket.on('gameFull', (submit) => {
     const gameName = submit["buttonText"];
     const gameId = submit["gameId"];
-    activeGames[gameId][1] += socket.id;
-    console.log("im Spiel "  + gameId + ": "+ activeGames[gameId][1]);
+    console.log(activeGames.gameId[1]);
+    // activeGames[gameId][1].push(socket.id);
+    console.log(activeGames);
+    socket.join(gameId);
     io.emit('gameNowFull', gameId);
+    io.to(gameId).emit('gameStart');
     delete activeGames[gameId];
   });
 
@@ -53,7 +56,12 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('User verlassen: ' + allUsers[socket.id])
     delete allUsers[socket.id];
+    if(activeGames["game"+socket.id]==undefined)
+    {
+      delete activeGames["game"+socket.id];
+    }
     io.emit('updatePlayerList', allUsers);
+    io.emit('showAllGames', activeGames);
   });
 });
 
