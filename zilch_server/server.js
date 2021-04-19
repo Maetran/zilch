@@ -26,11 +26,11 @@ io.on('connection', (socket) => {
   socket.on('createNewGame', (userGameName) => {
     const gameId = "game" + socket.id;
     socket.join(gameId);
+    activeGames[gameId] = [userGameName,[socket.id]];
     const gameParams = {"gameId": gameId, "name": userGameName};
     socket.emit('joinedGame', gameParams);
-    io.emit('newGameAvailable', gameParams);
-    activeGames[gameId] = [userGameName,[socket.id]];
-    console.log("im Spiel "  + gameId + ": "+ activeGames[gameId][1]);
+    io.emit('showAllGames', activeGames);
+    console.log("Spiel beigetreten ID "  + gameId + ": Spielerliste = "+ activeGames[gameId][1]);
   });
   // Leave current Game
   socket.on('leaveGame', (gameId) => {
@@ -41,16 +41,18 @@ io.on('connection', (socket) => {
   socket.on('gameFull', (submit) => {
     const gameName = submit["buttonText"];
     const gameId = submit["gameId"];
-    console.log(activeGames.gameId[1]);
-    // activeGames[gameId][1].push(socket.id);
-    console.log(activeGames);
+    console.log("Aktive Spiele anzeigen: " + activeGames);
+    console.log("Game Id beigetreten: " + gameId);
+    activeGames[gameId][1].push(socket.id);
+    console.log("Spieler in dieser Spiele ID: " + activeGames[gameId][1]);
     socket.join(gameId);
     io.emit('gameNowFull', gameId);
     io.to(gameId).emit('gameStart');
     delete activeGames[gameId];
+    io.emit('showAllGames', activeGames);
   });
 
-  // activeGames = {"gameId":["buttonText",[player1, player2]]}
+  // activeGames = {"gameId":["buttonText",["player1", "player2"]]}
 
   // update list after player leaves
   socket.on('disconnect', () => {
