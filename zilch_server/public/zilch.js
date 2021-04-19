@@ -454,7 +454,7 @@ socket.on('showAllGames', (activeGames) => {
     console.log("k: " + k + ", active games: " + activeGames[k]);
     newGameButton.setAttribute('onclick', 'joinThisGame("' + k + '")');
     newGameButton.setAttribute('id', k);
-    newGameButton.innerHTML = activeGames[k][0];
+    newGameButton.innerHTML = activeGames[k]["userGameName"];
     $('#availableGames').append(newGameButton);
   };
 });
