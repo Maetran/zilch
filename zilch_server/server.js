@@ -8,7 +8,8 @@ const activeGames = new Object();
 
 
 // *** Example of game values structure
-// activeGames = {[gameId]:{"userGameName":gameName, "players":{socketId1:playerName1,socketId2:playerName2}, session: gameParams}}
+// activeGames = {[gameId]:{"userGameName":gameName,
+//  "players":{socketId1:playerName1,socketId2:playerName2}, session: gameParams}}
 
 // Provide all files from public
 app.use(express.static('./public'));
@@ -30,10 +31,13 @@ io.on('connection', (socket) => {
   // Create new Game
   socket.on('createNewGame', (userGameName) => {
     const gameId = "game" + socket.id;
+    const socketId = socket.id;
+    const playerName = allUsers[socket.id];
     socket.join(gameId);
-    activeGames[gameId] = {"userGameName":[userGameName]};
+    activeGames[gameId] = {"userGameName":userGameName};
+    console.log("control: spieler name: " + allUsers[socket.id]);
     console.log("dieses spiel heisst: " + activeGames[gameId].userGameName);
-    activeGames[gameId].players = {[socket.id]:allUsers[socket.id]};
+    activeGames[gameId]["players"] = {[socketId]:playerName};
     console.log("dein spielername in dieser id: " + activeGames[gameId].players[socket.id]);
     const gameParams = {"gameId": gameId, "name": userGameName};
     socket.emit('joinedGame', gameParams);
@@ -47,28 +51,52 @@ io.on('connection', (socket) => {
     socket.to(gameId).emit('leftGame');
   });
 
+  // Checking if game is available for 2nd player
+    socket.on('joinRequest', (gameId) => {
+        for(k in activeGames)
+        {
+            if(k==gameId)
+            {
+                console.log("game id vorhanden: " + gameId + ", k: " + k + ". Einstieg ins Spiel möglich");
+                socket.emit('joinRequestAnswer', gameId);
+            }
+        }
+    });
+
   // Mark game as full (opened Game got 2nd Player)
   socket.on('gameFull', (submit) => {
-    const gameName = submit["buttonText"];
+    const socketId = socket.id;
+    const playerName = allUsers[socket.id];
     const gameId = submit["gameId"];
     console.log("Aktive Spiele anzeigen: " + activeGames);
     console.log("Game Id beigetreten: " + gameId);
-    activeGames[gameId].players = {[socket.id]:allUsers[socket.id]};
+    activeGames[gameId]["players"][socketId] = playerName;
     console.log("Spieler in dieser Spiele ID: " + activeGames[gameId].players[socket.id]);
     socket.join(gameId);
     io.emit('gameNowFull', gameId);
-    io.to(gameId).emit('gameStart');
-    delete activeGames[gameId];
+    io.to(gameId).emit('gameStart', gameId);
+    // delete activeGames[gameId];
     io.emit('showAllGames', activeGames);
+  });
+
+  // Roll the dice
+  socket.on('init', (gameId) => {
+      console.log("init aufrufen");
+      init(gameId);
+      console.log("init fertig aufgerufen");
+      io.to('gameId').emit('ausgabe', activeGames);
   });
 
   // update list after player leaves
   socket.on('disconnect', () => {
     console.log('User verlassen: ' + allUsers[socket.id])
     delete allUsers[socket.id];
-    if(activeGames["game"+socket.id]==undefined)
+    const gameName = "game" + socket.id;
+    if(activeGames[gameName]!=undefined)
     {
-      delete activeGames["game"+socket.id];
+        console.log("Spiel noch im Dict. drin: " + gameName);
+        delete activeGames[gameName];
+        console.log("Spiel jetzt gelöscht: " + gameName)
     }
     io.emit('updatePlayerList', allUsers);
     io.emit('showAllGames', activeGames);
@@ -190,9 +218,9 @@ function applyGameValuesToUi(x)
     }
 }
 
-function init()
-// creates gameValues and returns to DOM
+function init(gameId)
 {
+    console.log("jetzt in init function");
     const gameValues = {
         "gameCode": "thisIsARandomName",
         "currentPlayerID": 0,
@@ -233,10 +261,11 @@ function init()
             }
         ]
     };
-    activeGames[gameId].session = gameValues;
-    $("#namePlayer1").text(gameValues.player[0].name);
-    $("#namePlayer2").text(gameValues.player[1].name);
-    return gameValues;
+    console.log("init function fertig");
+    activeGames[gameId] = {"session":gameValues};
+    // $("#namePlayer1").text(gameValues.player[0].name);
+    // $("#namePlayer2").text(gameValues.player[1].name);
+    // return gameValues;
 }
 
 function rollUnholdDice(x)

@@ -461,8 +461,19 @@ socket.on('showAllGames', (activeGames) => {
 
 function createGame()
 {
-  const userGameName = prompt("Gib deinem Spiel einen Namen:");
-  socket.emit('createNewGame', userGameName);
+    const userGameName = prompt("Gib deinem Spiel einen Namen:");
+    if(userGameName==null)
+    {
+        console.log("***Abbrechen geklickt***");
+    }
+    else if(userGameName!="")
+    {
+        socket.emit('createNewGame', userGameName);
+    }
+    else
+    {
+        createGame()
+    }
 };
 
 function leaveGame()
@@ -472,17 +483,28 @@ function leaveGame()
 
 function joinThisGame(gameId)
 {
-  const newLeaveButton = document.createElement('button');
-  newLeaveButton.innerHTML = "Dieses Spiel beenden";
-  newLeaveButton.setAttribute('onclick', 'leaveGame("' + gameId + '")');
-  $('#leaveGameButton').append(newLeaveButton);
-  const buttonText = $('#'+gameId).text();
-  const submit = {"gameId":gameId, "buttonText":buttonText};
-  socket.emit('gameFull', submit);
-};
+    socket.emit('joinRequest', gameId);
+}
 
-socket.on('gameStart', () => {
+socket.on('joinRequestAnswer', (gameId) => {
+    console.log("Du darfst dem Spiel beitreten: " + gameId);
+    const newLeaveButton = document.createElement('button');
+    newLeaveButton.innerHTML = "Dieses Spiel beenden";
+    newLeaveButton.setAttribute('onclick', 'leaveGame("' + gameId + '")');
+    $('#leaveGameButton').append(newLeaveButton);
+    const buttonText = $('#'+gameId).text();
+    const submit = {"gameId":gameId, "buttonText":buttonText};
+    socket.emit('gameFull', submit);
+});
+
+socket.on('gameStart', (gameId) => {
   alert("Dein Spiel startet");
-})
+  console.log(gameId);
+  socket.emit('init', gameId);
+});
+
+socket.on('ausgabe', (activeGames) => {
+    console.log(activeGames);
+});
 
 location.hash = '';
