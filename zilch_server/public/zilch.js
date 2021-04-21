@@ -447,16 +447,19 @@ socket.on('leftGame', () => {
 });
 
 socket.on('showAllGames', (activeGames) => {
-  $('#availableGames').empty();
-  for(k in activeGames)
-  {
-    const newGameButton = document.createElement('button');
-    console.log("k: " + k + ", active games: " + activeGames[k]);
-    newGameButton.setAttribute('onclick', 'joinThisGame("' + k + '")');
-    newGameButton.setAttribute('id', k);
-    newGameButton.innerHTML = activeGames[k]["userGameName"];
-    $('#availableGames').append(newGameButton);
-  };
+    $('#availableGames').empty();
+    for(k in activeGames)
+    {
+        if(k.gameFull=="notFull")
+        {
+            const newGameButton = document.createElement('button');
+            console.log("k: " + k + ", active games: " + activeGames[k]);
+            newGameButton.setAttribute('onclick', 'joinThisGame("' + k + '")');
+            newGameButton.setAttribute('id', k);
+            newGameButton.innerHTML = activeGames[k]["userGameName"];
+            $('#availableGames').append(newGameButton);
+        }
+    };
 });
 
 function createGame()

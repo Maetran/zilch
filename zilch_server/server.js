@@ -9,7 +9,7 @@ const activeGames = new Object();
 
 // *** Example of game values structure
 // activeGames = {[gameId]:{"userGameName":gameName,
-//  "players":{socketId1:playerName1,socketId2:playerName2}, session: gameParams}}
+//  "players":{socketId1:playerName1,socketId2:playerName2}, "session": gameParams, "gameFull": full/notFull}}
 
 // Provide all files from public
 app.use(express.static('./public'));
@@ -40,6 +40,7 @@ io.on('connection', (socket) => {
     activeGames[gameId]["players"] = {[socketId]:playerName};
     console.log("dein spielername in dieser id: " + activeGames[gameId].players[socket.id]);
     const gameParams = {"gameId": gameId, "name": userGameName};
+    activeGames[gameId] = {"gameFull":"notFull"};
     socket.emit('joinedGame', gameParams);
     io.emit('showAllGames', activeGames);
     console.log("Spiel beigetreten ID "  + gameId);
@@ -75,7 +76,7 @@ io.on('connection', (socket) => {
     socket.join(gameId);
     io.emit('gameNowFull', gameId);
     io.to(gameId).emit('gameStart', gameId);
-    // delete activeGames[gameId];
+    activeGames[gameId]["gameFull"] = "full";
     io.emit('showAllGames', activeGames);
   });
 
