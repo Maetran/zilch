@@ -40,7 +40,8 @@ io.on('connection', (socket) => {
     activeGames[gameId]["players"] = {[socketId]:playerName};
     console.log("dein spielername in dieser id: " + activeGames[gameId].players[socket.id]);
     const gameParams = {"gameId": gameId, "name": userGameName};
-    activeGames[gameId] = {"gameFull":"notFull"};
+    activeGames[gameId]["gameFull"] = "notFull";
+    console.log("game full?: " + activeGames[gameId].gameFull);
     socket.emit('joinedGame', gameParams);
     io.emit('showAllGames', activeGames);
     console.log("Spiel beigetreten ID "  + gameId);
