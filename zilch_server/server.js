@@ -78,6 +78,7 @@ io.on('connection', (socket) => {
     io.emit('gameNowFull', gameId);
     io.to(gameId).emit('gameStart', gameId);
     activeGames[gameId]["gameFull"] = "full";
+    console.log(activeGames[gameId].gameFull);
     io.emit('showAllGames', activeGames);
   });
 

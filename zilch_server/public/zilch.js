@@ -450,8 +450,10 @@ socket.on('showAllGames', (activeGames) => {
     $('#availableGames').empty();
     for(k in activeGames)
     {
-        if(k.gameFull=="notFull")
+        console.log("es läuft: showAllGames");
+        if(activeGames[k].gameFull=="notFull")
         {
+            console.log("in der schleife mit k");
             const newGameButton = document.createElement('button');
             console.log("k: " + k + ", active games: " + activeGames[k]);
             newGameButton.setAttribute('onclick', 'joinThisGame("' + k + '")');
