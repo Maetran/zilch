@@ -83,7 +83,7 @@ io.on('connection', (socket) => {
   // Roll the dice
   socket.on('init', (gameId) => {
       console.log("init aufrufen");
-      init(gameId);
+      init(gameId); 
       console.log("init fertig aufgerufen");
       io.to('gameId').emit('ausgabe', activeGames);
   });
