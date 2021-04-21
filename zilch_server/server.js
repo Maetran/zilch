@@ -9,7 +9,7 @@ const activeGames = new Object();
 
 // *** Example of game values structure
 // activeGames = {[gameId]:{"userGameName":gameName,
-//  "players":{socketId1:playerName1,socketId2:playerName2}, "session": gameParams, "gameFull": full/notFull}}
+//  "players":{"player1":playerName1,"player2":playerName2}, "session": gameParams, "gameFull": full/notFull}}
 
 // Provide all files from public
 app.use(express.static('./public'));
@@ -37,7 +37,7 @@ io.on('connection', (socket) => {
     activeGames[gameId] = {"userGameName":userGameName};
     console.log("control: spieler name: " + allUsers[socket.id]);
     console.log("dieses spiel heisst: " + activeGames[gameId].userGameName);
-    activeGames[gameId]["players"] = {[socketId]:playerName};
+    activeGames[gameId]["players"] = {"player1":playerName};
     console.log("dein spielername in dieser id: " + activeGames[gameId].players[socket.id]);
     const gameParams = {"gameId": gameId, "name": userGameName};
     activeGames[gameId]["gameFull"] = "notFull";
@@ -72,7 +72,7 @@ io.on('connection', (socket) => {
     const gameId = submit["gameId"];
     console.log("Aktive Spiele anzeigen: " + activeGames);
     console.log("Game Id beigetreten: " + gameId);
-    activeGames[gameId]["players"][socketId] = playerName;
+    activeGames[gameId].players.player2 = playerName;
     console.log("Spieler in dieser Spiele ID: " + activeGames[gameId].players[socket.id]);
     socket.join(gameId);
     io.emit('gameNowFull', gameId);
@@ -82,13 +82,18 @@ io.on('connection', (socket) => {
     io.emit('showAllGames', activeGames);
   });
 
-  // Roll the dice
-  socket.on('init', (gameId) => {
-      console.log("init aufrufen");
-      init(gameId); 
-      console.log("init fertig aufgerufen");
-      io.to('gameId').emit('ausgabe', activeGames);
+  // Init values
+    socket.on('init', (gameId) => {
+        const gameValues = init(gameId); 
+        io.to(gameId).emit('nameToCountTable', gameValues);
   });
+
+  // First roll requested
+  socket.on('requestFirstRoll', (gameId) => {
+      rollUnholdDice(1, gameId);
+      const firstRollValues = activeGames[gameId].session;
+      io.to(gameId).emit('firstRollToUi', (firstRollValues));
+    })
 
   // update list after player leaves
   socket.on('disconnect', () => {
@@ -113,43 +118,55 @@ server.listen(3003, () => {
 
 /// *** GAME LOGIC STARTS
 
-function bilder(x)
-// provides link to the pictures needed to display
+function init(gameId)
 {
-    switch(x)
-    {
-        case 1:
-            return "one.png";
-        case 2:
-            return "two.png";
-        case 3:
-            return "three.png";
-        case 4:
-            return "four.png";
-        case 5:
-            return "five.png";
-        case 6:
-            return "six.png";
-    }
+    const gameValues = {
+        "gameCode": gameId,
+        "currentPlayerID": 0,
+        "player": [
+            {
+                "playerID": 0,
+                "name": activeGames[gameId].players.player1,
+                "momPoints": 0,
+                "holdPoints": 0,
+                "totalPoints": 0,
+                "durchgang": 1,
+                "nextRollOK":true,
+                "wurfel": [
+                    {"augenzahl": 2, "hold": false, "locked": false, "counted": false}, // dice 1-6
+                    {"augenzahl": 2, "hold": false, "locked": false, "counted": false},
+                    {"augenzahl": 5, "hold": false, "locked": false, "counted": false},
+                    {"augenzahl": 4, "hold": false, "locked": false, "counted": false},
+                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
+                    {"augenzahl": 5, "hold": false, "locked": false, "counted": false}
+                ]
+            },
+            {
+                "playerID": 1,
+                "name": activeGames[gameId].players.player2,
+                "momPoints": 0,
+                "holdPoints": 0,
+                "totalPoints": 0,
+                "durchgang": 1,
+                "nextRollOK":true,
+                "wurfel": [
+                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false}, // dice 1-6
+                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
+                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
+                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
+                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
+                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false}
+                ]
+            }
+        ]
+    };
+    activeGames[gameId].session = gameValues;
+    return gameValues;
 }
 
-function getWuerfelIDs()
-// adds dice dictionary to DOM
+function getCurrentPlayer(gameId)
 {
-    let wuerfelIDs = {"wuerfelEins":1,"wuerfelZwei":2,"wuerfelDrei":3,"wuerfelVier":4,"wuerfelFuenf":5,"wuerfelSechs":6};
-    return wuerfelIDs;
-}
-
-function assignNewPic(i, x)
-// is called if a new assignment of picture is needed
-{
-    const counters = ["Eins", "Zwei", "Drei", "Vier", "Fuenf", "Sechs"];
-    $("#wuerfel" + counters[i]).attr("src", bilder(x));
-}
-
-function getCurrentPlayer()
-{
-    return gameValues.currentPlayerID
+    return activeGames[gameId].session.currentPlayerID;
 }
 
 function switchCurrentPlayer()
@@ -221,94 +238,50 @@ function applyGameValuesToUi(x)
     }
 }
 
-function init(gameId)
+function rollUnholdDice(x, gameId)
+// function called on game start and eventlistener
+// to reroll all not-checked dice ("noHold")
 {
-    console.log("jetzt in init function");
-    const gameValues = {
-        "gameCode": "thisIsARandomName",
-        "currentPlayerID": 0,
-        "player": [
-            {
-                "playerID": 0,
-                "name": "Manuel",
-                "momPoints": 0,
-                "holdPoints": 0,
-                "totalPoints": 0,
-                "durchgang": 1,
-                "nextRollOK":true,
-                "wurfel": [
-                    {"augenzahl": 2, "hold": false, "locked": false, "counted": false}, // dice 1-6
-                    {"augenzahl": 2, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 5, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 4, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 5, "hold": false, "locked": false, "counted": false}
-                ]
-            },
-            {
-                "playerID": 1,
-                "name": "Markus",
-                "momPoints": 0,
-                "holdPoints": 0,
-                "totalPoints": 0,
-                "durchgang": 1,
-                "nextRollOK":true,
-                "wurfel": [
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false}, // dice 1-6
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false}
-                ]
-            }
-        ]
-    };
-    console.log("init function fertig");
-    activeGames[gameId] = {"session":gameValues};
-    // $("#namePlayer1").text(gameValues.player[0].name);
-    // $("#namePlayer2").text(gameValues.player[1].name);
-    // return gameValues;
-}
+    console.log(activeGames);
+    console.log(activeGames[gameId]);
+    console.log(activeGames[gameId].session);
+    console.log(activeGames[gameId].session);
+    console.log(activeGames[gameId].session.currentPlayerID);
 
-function rollUnholdDice(x)
-// function called by body.onload and eventlistener to reroll all not-checked dice ("noHold")
-{
-    let playerID = getCurrentPlayer();
-    $("#spielerName1").text(gameValues.player[playerID].name);
+    let playerID = getCurrentPlayer(gameId);
     if(x==1)
     //new set of 6 dice
     {
         for(let i=0; i<6; i++)
         {
             let newWuerfel = parseInt(Math.random() * 6 + 1);
-            gameValues.player[playerID].wurfel[i].augenzahl = newWuerfel;
-            assignNewPic(i, newWuerfel);
-        }
-        $("#sondertext").text("");
-        //check if first roll has nothing: no 1, no 5 and no dice occures more than 2x
-        let has1or5 = gameValues.player[playerID].wurfel.some(a=>[1,5].includes(a.augenzahl));   // checks if the first roll does not contain 1 and/or 5.
-        if(has1or5==false)
-        {
-            let holdList = [];
-            let helperList = [];
-            gameValues.player[playerID].wurfel.forEach(a=>{holdList.push(a.augenzahl)});
-            for(let i=1;i<7;i++)
-            {
-                helperList.push(holdList.filter(a=>a==i).length)
-            }
-            let has3idents = helperList.some(a=>[3,4,5,6].includes(a));
-            if(!has3idents)
-            {
-                applyGameValuesToUi(3);
-                gameValues.player[playerID].momPoints += 500 + gameValues.player[playerID].holdPoints;
-                $("#punkteAnzeige").text(gameValues.player[playerID].momPoints);
-                $("#sondertext").text("Du hast NICHTS gewürfelt. Los - nochmal. Gibt 500 extra Looser Punkte");
-            }
+            activeGames[gameId].session.player[playerID].wurfel[i].augenzahl = newWuerfel;
         }
     }
+    //     $("#sondertext").text("");
+    //     //check if first roll has nothing: no 1, no 5 and no dice occures more than 2x
+    //     let has1or5 = gameValues.player[playerID].wurfel.some(a=>[1,5].includes(a.augenzahl));   // checks if the first roll does not contain 1 and/or 5.
+    //     if(has1or5==false)
+    //     {
+    //         let holdList = [];
+    //         let helperList = [];
+    //         gameValues.player[playerID].wurfel.forEach(a=>{holdList.push(a.augenzahl)});
+    //         for(let i=1;i<7;i++)
+    //         {
+    //             helperList.push(holdList.filter(a=>a==i).length)
+    //         }
+    //         let has3idents = helperList.some(a=>[3,4,5,6].includes(a));
+    //         if(!has3idents)
+    //         {
+    //             applyGameValuesToUi(3);
+    //             gameValues.player[playerID].momPoints += 500 + gameValues.player[playerID].holdPoints;
+    //             $("#punkteAnzeige").text(gameValues.player[playerID].momPoints);
+    //             $("#sondertext").text("Du hast NICHTS gewürfelt. Los - nochmal. Gibt 500 extra Looser Punkte");
+    //         }
+        // }
+    // }
 
-    else if(x==2)
+    if(x==2)
     // called after click on roll button
     {
         let validator = [""];

@@ -450,12 +450,9 @@ socket.on('showAllGames', (activeGames) => {
     $('#availableGames').empty();
     for(k in activeGames)
     {
-        console.log("es läuft: showAllGames");
         if(activeGames[k].gameFull=="notFull")
         {
-            console.log("in der schleife mit k");
             const newGameButton = document.createElement('button');
-            console.log("k: " + k + ", active games: " + activeGames[k]);
             newGameButton.setAttribute('onclick', 'joinThisGame("' + k + '")');
             newGameButton.setAttribute('id', k);
             newGameButton.innerHTML = activeGames[k]["userGameName"];
@@ -504,12 +501,59 @@ socket.on('joinRequestAnswer', (gameId) => {
 
 socket.on('gameStart', (gameId) => {
   alert("Dein Spiel startet");
-  console.log(gameId);
   socket.emit('init', gameId);
 });
 
-socket.on('ausgabe', (activeGames) => {
-    console.log(activeGames);
+socket.on('nameToCountTable', (gameValues) => {
+    $("#namePlayer1").text(gameValues.player[0].name);
+    $("#namePlayer2").text(gameValues.player[1].name);
+    socket.emit('requestFirstRoll', (gameValues["gameCode"]));
+});
+
+socket.on('firstRollToUi', (firstRollValues) => {
+    const activePlayer = firstRollValues.currentPlayerID;
+    const activePlayerName = firstRollValues.player[activePlayer].name;
+    $("#spielerName1").text(activePlayerName);
+    for(let i=0; i<6; i++)
+    {
+        let dice = firstRollValues.player[activePlayer].wurfel[i].augenzahl;
+        assignNewPic(i, dice);
+    }
 });
 
 location.hash = '';
+
+
+function bilder(x)
+// provides link to the pictures needed to display
+{
+    switch(x)
+    {
+        case 1:
+            return "one.png";
+        case 2:
+            return "two.png";
+        case 3:
+            return "three.png";
+        case 4:
+            return "four.png";
+        case 5:
+            return "five.png";
+        case 6:
+            return "six.png";
+    }
+}
+
+function getWuerfelIDs()
+// adds dice dictionary to DOM
+{
+    let wuerfelIDs = {"wuerfelEins":1,"wuerfelZwei":2,"wuerfelDrei":3,"wuerfelVier":4,"wuerfelFuenf":5,"wuerfelSechs":6};
+    return wuerfelIDs;
+}
+
+function assignNewPic(i, x)
+// is called if a new assignment of picture is needed
+{
+    const counters = ["Eins", "Zwei", "Drei", "Vier", "Fuenf", "Sechs"];
+    $("#wuerfel" + counters[i]).attr("src", bilder(x));
+}
