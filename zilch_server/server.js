@@ -9,7 +9,7 @@ const activeGames = new Object();
 
 // *** Example of game values structure
 // activeGames = {[gameId]:{"userGameName":gameName,
-//  "players":{"player1":playerName1,"player2":playerName2}, "session": gameParams, "gameFull": full/notFull}}
+//  "players":[{"name":playerName,"socketId":socketId, "currentPlayer": 0}], "session": gameParams, "gameFull": full/notFull}}
 
 // Provide all files from public
 app.use(express.static('./public'));
@@ -31,20 +31,15 @@ io.on('connection', (socket) => {
   // Create new Game
   socket.on('createNewGame', (userGameName) => {
     const gameId = "game" + socket.id;
-    const socketId = socket.id;
     const playerName = allUsers[socket.id];
     socket.join(gameId);
     activeGames[gameId] = {"userGameName":userGameName};
-    console.log("control: spieler name: " + allUsers[socket.id]);
-    console.log("dieses spiel heisst: " + activeGames[gameId].userGameName);
-    activeGames[gameId]["players"] = {"player1":playerName};
-    console.log("dein spielername in dieser id: " + activeGames[gameId].players[socket.id]);
+    activeGames[gameId]["players"] = [{"name":playerName, "socketId": socket.id, "currentPlayer":0}];
+    console.log("dein spielername in dieser id: " + activeGames[gameId].players[0].name);
     const gameParams = {"gameId": gameId, "name": userGameName};
     activeGames[gameId]["gameFull"] = "notFull";
-    console.log("game full?: " + activeGames[gameId].gameFull);
     socket.emit('joinedGame', gameParams);
     io.emit('showAllGames', activeGames);
-    console.log("Spiel beigetreten ID "  + gameId);
   });
 
   // Leave current Game
@@ -67,13 +62,12 @@ io.on('connection', (socket) => {
 
   // Mark game as full (opened Game got 2nd Player)
   socket.on('gameFull', (submit) => {
-    const socketId = socket.id;
     const playerName = allUsers[socket.id];
     const gameId = submit["gameId"];
     console.log("Aktive Spiele anzeigen: " + activeGames);
     console.log("Game Id beigetreten: " + gameId);
-    activeGames[gameId].players.player2 = playerName;
-    console.log("Spieler in dieser Spiele ID: " + activeGames[gameId].players[socket.id]);
+    activeGames[gameId].players.push({"name":playerName, "socketId": socket.id, "currentPlayer":1});
+    console.log("dein spielername in dieser id: " + activeGames[gameId].players[1].name);
     socket.join(gameId);
     io.emit('gameNowFull', gameId);
     io.to(gameId).emit('gameStart', gameId);
@@ -84,19 +78,30 @@ io.on('connection', (socket) => {
 
   // Init values
     socket.on('init', (gameId) => {
-        const gameValues = init(gameId); 
+        const mySocketId = socket.id;
+        const gameValues = init(gameId, mySocketId); 
         io.to(gameId).emit('nameToCountTable', gameValues);
   });
 
-  // First roll requested
-  socket.on('requestFirstRoll', (gameId) => {
-      rollUnholdDice(1, gameId);
-      const firstRollValues = activeGames[gameId].session;
-      io.to(gameId).emit('firstRollToUi', (firstRollValues));
-    })
+    // First roll requested
+    socket.on('requestFirstRoll', (gameId) => {
+        rollUnholdDice(1, gameId);
+        const firstRollValues = activeGames[gameId].session;
+        io.to(gameId).emit('firstRollToUi', (firstRollValues));
+    });
 
-  // update list after player leaves
-  socket.on('disconnect', () => {
+    // Requested to hold 1 dice
+    socket.on('holdDiceRequest', (submit) => {
+        const playerId = submit["playerId"];
+        const gameId = submit["gameId"];
+        const diceIndexToHold = submit["diceIndexToHold"];
+        console.log(diceIndexToHold);
+        activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].hold = true;
+        io.to(gameId).emit('confirmLock', (activeGames[gameId].session))
+    });
+
+    // update list after player leaves
+    socket.on('disconnect', () => {
     console.log('User verlassen: ' + allUsers[socket.id])
     delete allUsers[socket.id];
     const gameName = "game" + socket.id;
@@ -108,7 +113,7 @@ io.on('connection', (socket) => {
     }
     io.emit('updatePlayerList', allUsers);
     io.emit('showAllGames', activeGames);
-  });
+    });
 });
 
 // Server port
@@ -118,7 +123,7 @@ server.listen(3003, () => {
 
 /// *** GAME LOGIC STARTS
 
-function init(gameId)
+function init(gameId, mySocketId)
 {
     const gameValues = {
         "gameCode": gameId,
@@ -126,7 +131,8 @@ function init(gameId)
         "player": [
             {
                 "playerID": 0,
-                "name": activeGames[gameId].players.player1,
+                "name": activeGames[gameId].players[0].name,
+                "socketId": activeGames[gameId].players[0].socketId,
                 "momPoints": 0,
                 "holdPoints": 0,
                 "totalPoints": 0,
@@ -143,7 +149,8 @@ function init(gameId)
             },
             {
                 "playerID": 1,
-                "name": activeGames[gameId].players.player2,
+                "name": activeGames[gameId].players[1].name,
+                "socketId": activeGames[gameId].players[1].socketId,
                 "momPoints": 0,
                 "holdPoints": 0,
                 "totalPoints": 0,
@@ -174,20 +181,6 @@ function switchCurrentPlayer()
     gameValues.currentPlayerID = gameValues.currentPlayerID==0 ? 1 : 0;
 }
 
-function registerHoldListener()
-// registers a listener to the document - needed for each click on a dice
-{
-    $("div img").click(function(event){
-        let playerID = getCurrentPlayer();
-        let imgID = event.target.id;
-        if(gameValues.player[playerID].wurfel[wuerfelIDs[imgID]-1].locked != true)
-        {
-            gameValues.player[playerID].wurfel[wuerfelIDs[imgID]-1].hold = !gameValues.player[playerID].wurfel[wuerfelIDs[imgID]-1].hold;
-            applyGameValuesToUi(1);
-        }
-    });
-}
-
 function registerButtonListerner()
 // registers a listener for the buttons and fires events
 {
@@ -200,42 +193,6 @@ function registerCounterListener()
 // registers a listener for each click, which analyzes the mom points
 {
     $("div img").click(function(){analyze()})
-}
-
-function applyGameValuesToUi(x)
-{
-    let playerID = getCurrentPlayer();
-    for(let i=0;i<6;i++)
-    {
-        if(x==1)    // is called when player clicks on dice, adds new class to the dice; needed for analyze
-        {
-            let thisWuerfelHoldBool = gameValues.player[playerID].wurfel[i].hold;
-            if(thisWuerfelHoldBool)
-            {
-                $($("div img")[i]).addClass("hold");
-            }
-            else if(thisWuerfelHoldBool == false)
-            {
-                $($("div img")[i]).removeClass("hold");
-            }
-        }
-        if(x==2)    // is called when reroll unhold dice. x==2 -> adds locked class and removes hold class
-        {
-            let thisWuerfelLockedBool = gameValues.player[playerID].wurfel[i].locked;
-            if(thisWuerfelLockedBool)
-            {
-                $($("div img")[i]).addClass("locked");
-                $($("div img")[i]).removeClass("hold");
-            }
-        }
-        if(x==3)    // is called when player rolls nothing, all dice are going to be locked, player gains +500 and is allowed to roll next roll;
-        {
-            for(let i=0; i<6;i++)
-            {
-                $($("div img")[i]).addClass("hold");
-            }
-        }
-    }
 }
 
 function rollUnholdDice(x, gameId)
