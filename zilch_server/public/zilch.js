@@ -217,7 +217,9 @@ function applyGameValuesToUi(x)
     let gameValues = fromSessionStorage();
     for(let i=0;i<6;i++)
     {
-        if(x==1)    // is called when player clicks on dice, adds new class to the dice; needed for analyze
+        if(x==1)
+        // is called when player clicks on dice, adds new class to the dice;
+        // needed for analyze
         {
             let thisWuerfelHoldBool = gameValues.player[playerID].wurfel[i].hold;
             if(thisWuerfelHoldBool)
@@ -247,3 +249,59 @@ function applyGameValuesToUi(x)
         // }
     }
 }
+
+function registerCounterListener()
+// registers a listener for each click, which analyzes the mom points
+{
+    $("div img").click(() => 
+    {
+        if(isItMyTurn())
+        {
+            const gameId = myGameId();
+            socket.emit('analyze', gameId);
+        }
+        else{console.log("Du bist nicht dran")};
+    });
+}
+
+socket.on('itWasCounted', (thisRoll) => {
+    toSessionStorage(thisRoll);
+    let playerID = currentPlayerId();
+    let gameValues = fromSessionStorage();
+    $("#punkteAnzeige").text(gameValues.player[playerID].momPoints+gameValues.player[playerID].holdPoints);
+})
+
+function registerButtonListener()
+// registers a listener for the buttons and fires events
+{
+
+    $("#knopf1").click(() => {rollUnholdDice2()});
+    $("#knopf2").click(() => 
+    {
+        if(isItMyTurn())
+        {
+            bank()
+        }
+    });
+    $("#knopf3").click(() => 
+    {
+        if(isItMyTurn())
+        {
+            zilch(1)
+        }
+    });
+}
+
+function rollUnholdDice2()
+{
+    if(isItMyTurn())
+    {
+        const gameId = myGameId();
+        socket.emit('rollDice', gameId);
+    }
+}
+
+socket.on('unholdDiceRolled', (thisRoll) => {
+    toSessionStorage(thisRoll);
+    
+})

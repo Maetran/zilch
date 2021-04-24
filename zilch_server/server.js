@@ -100,6 +100,18 @@ io.on('connection', (socket) => {
         io.to(gameId).emit('confirmLock', (activeGames[gameId].session))
     });
 
+    // Clicked on any dice, analyze if points
+    socket.on('analyze', (gameId) => {
+        analyze(gameId);
+        io.to(gameId).emit('itWasCounted', (activeGames[gameId].session));
+    });
+
+    // Regular roll of dice after holding
+    socket.on('rollDice', (gameId) => {
+        rollUnholdDice(2, gameId);
+        io.to(gameId).emit('unholdDiceRolled', (activeGames[gameId].session));
+    })
+
     // update list after player leaves
     socket.on('disconnect', () => {
     console.log('User verlassen: ' + allUsers[socket.id])
@@ -123,7 +135,7 @@ server.listen(3003, () => {
 
 /// *** GAME LOGIC STARTS
 
-function init(gameId, mySocketId)
+function init(gameId)
 {
     const gameValues = {
         "gameCode": gameId,
@@ -181,20 +193,6 @@ function switchCurrentPlayer()
     gameValues.currentPlayerID = gameValues.currentPlayerID==0 ? 1 : 0;
 }
 
-function registerButtonListerner()
-// registers a listener for the buttons and fires events
-{
-    $("#knopf1").click(function(){rollUnholdDice(2)});
-    $("#knopf2").click(function(){bank()});
-    $("#knopf3").click(function(){zilch(1)});
-}
-
-function registerCounterListener()
-// registers a listener for each click, which analyzes the mom points
-{
-    $("div img").click(function(){analyze()})
-}
-
 function rollUnholdDice(x, gameId)
 // function called on game start and eventlistener
 // to reroll all not-checked dice ("noHold")
@@ -242,11 +240,11 @@ function rollUnholdDice(x, gameId)
     // called after click on roll button
     {
         let validator = [""];
-        gameValues.player[playerID].wurfel.forEach(a=>{if(a.counted==false&&a.hold==true){validator.push("stop")}});
-        if(gameValues.player[playerID].nextRollOK != true)
+        activeGames[gameId].session.player[playerID].wurfel.forEach(a=>{if(a.counted==false&&a.hold==true){validator.push("stop")}});
+        if(activeGames[gameId].session.player[playerID].nextRollOK != true)
         {
             alert("Du darfst Würfel ohne Punkteeinfluss nicht halten");
-            gameValues.player[playerID].wurfel.forEach(a=>{if(a.hold==true&&a.counted==true){a.counted==false}});
+            activeGames[gameId].session.player[playerID].wurfel.forEach(a=>{if(a.hold==true&&a.counted==true){a.counted==false}});
             return;
         }
         else if(validator.includes("stop"))
@@ -254,24 +252,24 @@ function rollUnholdDice(x, gameId)
             alert("Das geht so nicht!");
             return;
         }
-        else if($(".hold").length==0||gameValues.player[playerID].momPoints==0)    // checks if any dice is on hold
+        else if(activeGames[gameId].session.player[playerID].wurfel.every(a=>a.hold==false)||activeGames[gameId].session.player[playerID].momPoints==0)    // checks if any dice is on hold
         {
-            alert("Du kannst nicht würfeln ohne zu halten");
+            console.log("Du kannst nicht würfeln ohne zu halten");
             return;
         }
         else if(($(".hold").length) + ($(".locked").length)==6)
         {
-            gameValues.player[playerID].holdPoints += gameValues.player[playerID].momPoints;
+            activeGames[gameId].session.player[playerID].holdPoints += activeGames[gameId].session.player[playerID].momPoints;
             $("div img").removeClass();
-            gameValues.player[playerID].wurfel.forEach(a=> {a.hold=false;a.locked=false});
+            activeGames[gameId].session.player[playerID].wurfel.forEach(a=> {a.hold=false;a.locked=false});
             rollUnholdDice(1);
             return;
         }
         else
         {
-            gameValues.player[playerID].holdPoints += gameValues.player[playerID].momPoints;
-            gameValues.player[playerID].momPoints = 0;
-            (gameValues.player[playerID].wurfel).forEach((a,i) => {
+            activeGames[gameId].session.player[playerID].holdPoints += activeGames[gameId].session.player[playerID].momPoints;
+            activeGames[gameId].session.player[playerID].momPoints = 0;
+            (activeGames[gameId].session.player[playerID].wurfel).forEach((a,i) => {
                 if(a.hold == false && a.locked == false)
                 {
                     a.augenzahl = parseInt(Math.random() * 6 + 1);
@@ -288,19 +286,18 @@ function rollUnholdDice(x, gameId)
     }
 }
 
-function validateAsCounted(x)
+function validateAsCounted(x, gameId, playerID)
 {
-    let playerID = getCurrentPlayer();
-    gameValues.player[playerID].wurfel.forEach(a=>{if(a.hold==true && a.augenzahl==x){a.counted=true}});
+    activeGames[gameId].session.player[playerID].wurfel.forEach(a=>{if(a.hold==true && a.augenzahl==x){a.counted=true}});
 }
 
-function analyze()
+function analyze(gameId)
 // is called any time a dice is selected or unselected and analyzes the mom points
 {
-    let playerID = getCurrentPlayer();
-    gameValues.player[playerID].momPoints = 0;
-    gameValues.player[playerID].nextRollOK = true;
-    const holdDiceWithOccurence = gameValues.player[playerID].wurfel
+    const playerID = getCurrentPlayer(gameId);
+    activeGames[gameId].session.player[playerID].momPoints = 0;
+    activeGames[gameId].session.player[playerID].nextRollOK = true;
+    const holdDiceWithOccurence = activeGames[gameId].session.player[playerID].wurfel
         .filter(wurfel=>wurfel.hold)
         .reduce((holdDiceMap,wurfel)=>{
             holdDiceMap[wurfel.augenzahl] += 1;
@@ -308,17 +305,16 @@ function analyze()
     },{1:0,2:0,3:0,4:0,5:0,6:0})
     for(k in holdDiceWithOccurence)
     {
-        let playerID = getCurrentPlayer();
         let y = holdDiceWithOccurence[k]; // y for readability - gives the occurence of one specific dice as number
         switch(k)
         {
             case "1":
-                gameValues.player[playerID].momPoints += 100 * y;
-                validateAsCounted(k)
+                activeGames[gameId].session.player[playerID].momPoints += 100 * y;
+                validateAsCounted(k, gameId, playerID) // TODO
                 break;
             case "5":
-                gameValues.player[playerID].momPoints += 50 * y;
-                validateAsCounted(k)
+                activeGames[gameId].session.player[playerID].momPoints += 50 * y;
+                validateAsCounted(k, gameId, playerID) // TODO
                 break;
         }
         if(y!=0)
@@ -326,9 +322,9 @@ function analyze()
             let holdDice = [];
             for(let j=0;j<6;j++)
             {
-                if(gameValues.player[playerID].wurfel[j].hold == true)
+                if(activeGames[gameId].session.player[playerID].wurfel[j].hold == true)
                 {
-                    holdDice.push(gameValues.player[playerID].wurfel[j].augenzahl);
+                    holdDice.push(activeGames[gameId].session.player[playerID].wurfel[j].augenzahl);
                 }
             }
 
@@ -336,7 +332,7 @@ function analyze()
 
             if(isStreet)
             {
-                gameValues.player[playerID].momPoints = 2000;
+                activeGames[gameId].session.player[playerID].momPoints = 2000;
             }
         }
         if(y>2 && y<6)
@@ -344,32 +340,32 @@ function analyze()
             switch(k)
             {
                 case "1":
-                    gameValues.player[playerID].momPoints += 700;
-                    validateAsCounted(k);
+                    activeGames[gameId].session.player[playerID].momPoints += 700;
+                    validateAsCounted(k, gameId, playerID);
                     break;
                 case "2":
-                    gameValues.player[playerID].momPoints += 200;
-                    if(y==4||y==5){gameValues.player[playerID].nextRollOK = false};
-                    validateAsCounted(k);
+                    activeGames[gameId].session.player[playerID].momPoints += 200;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerID].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerID);
                     break;
                 case "3":
-                    gameValues.player[playerID].momPoints += 300;
-                    if(y==4||y==5){gameValues.player[playerID].nextRollOK = false};
-                    validateAsCounted(k);
+                    activeGames[gameId].session.player[playerID].momPoints += 300;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerID].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerID);
                     break;
                 case "4":
-                    gameValues.player[playerID].momPoints += 400;
-                    if(y==4||y==5){gameValues.player[playerID].nextRollOK = false};
-                    validateAsCounted(k);
+                    activeGames[gameId].session.player[playerID].momPoints += 400;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerID].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerID);
                     break;
                 case "5":
-                    gameValues.player[playerID].momPoints += 350;
-                    validateAsCounted(k);
+                    activeGames[gameId].session.player[playerID].momPoints += 350;
+                    validateAsCounted(k, gameId, playerID);
                     break;
                 case "6":
-                    gameValues.player[playerID].momPoints += 600;
-                    if(y==4||y==5){gameValues.player[playerID].nextRollOK = false};
-                    validateAsCounted(k);
+                    activeGames[gameId].session.player[playerID].momPoints += 600;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerID].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerID);
                     break;
             }
         }
@@ -378,27 +374,26 @@ function analyze()
             switch(k)
             {
                 case "1":
-                    gameValues.player[playerID].momPoints = 2000;
+                    activeGames[gameId].session.player[playerID].momPoints = 2000;
                     break;
                 case "2":
-                    gameValues.player[playerID].momPoints = 400;
+                    activeGames[gameId].session.player[playerID].momPoints = 400;
                     break;
                 case "3":
-                    gameValues.player[playerID].momPoints = 600;
+                    activeGames[gameId].session.player[playerID].momPoints = 600;
                     break;
                 case "4":
-                    gameValues.player[playerID].momPoints = 800;
+                    activeGames[gameId].session.player[playerID].momPoints = 800;
                     break;
                 case "5":
-                    gameValues.player[playerID].momPoints = 1000;
+                    activeGames[gameId].session.player[playerID].momPoints = 1000;
                     break;
                 case "6":
-                    gameValues.player[playerID].momPoints = 1200;
+                    activeGames[gameId].session.player[playerID].momPoints = 1200;
                     break;
             }
         }
     }
-    $("#punkteAnzeige").text(gameValues.player[playerID].momPoints+gameValues.player[playerID].holdPoints);
 }
 
 function zilch(x) // kind of reset
