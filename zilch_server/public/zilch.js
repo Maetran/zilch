@@ -160,8 +160,8 @@ function fromSessionStorage()
 
 function isItMyTurn()
 {
-    let myTurn = JSON.parse(sessionStorage.gameValues).currentPlayerID;
-    if(myTurn==sessionStorage.getItem("myId")){return true}
+    let currPlayer = currentPlayerId();
+    if(currPlayer==(sessionStorage.getItem("myId"))){return true}
     else{return false};
 }
 
@@ -188,49 +188,66 @@ function holdListener()
         $("div img").click(event => {
             const gameValues = fromSessionStorage();
             const playerID = myPlayerId();
-            const gameID = myGameId();
+            const gameId = myGameId();
             const wuerfelIDs = {"wuerfelEins":1,"wuerfelZwei":2,"wuerfelDrei":3,
                 "wuerfelVier":4,"wuerfelFuenf":5,"wuerfelSechs":6};
-            let imgID = event.target.id;
-            if(gameValues.player[playerID].wurfel[wuerfelIDs[imgID]-1].locked != true)
-            {
-                gameValues.player[playerID].wurfel[wuerfelIDs[imgID]-1].hold = !gameValues.player[playerID].wurfel[wuerfelIDs[imgID]-1].hold;
-                console.log("dieser würfel wird jetzt gehalten")
-                const submit = {"diceIndexToHold": parseInt(wuerfelIDs[imgID]-1)};
-                submit["playerId"] = playerID;
-                submit["gameId"] = gameID;
-                socket.emit('holdDiceRequest', submit);
-            }
+            const imgID = event.target.id;
+            const diceIndexToHold = (wuerfelIDs[imgID]-1)
+            const submit = {"gameId": gameId, "diceIndexToHold": diceIndexToHold}
+            socket.emit('holdDiceChangeRequest', submit);
         });
     }
     else{console.log("Du bist nicht dran!")};
 }
 
-socket.on('confirmLock', thisRoll => {
+socket.on('confirmHoldChange', thisRoll => {
     toSessionStorage(thisRoll);
-    applyGameValuesToUi(1);
+    applyGameValuesToUi();
 });
 
-function applyGameValuesToUi(x)
+function applyGameValuesToUi()
 {
     let playerID = currentPlayerId();
     let gameValues = fromSessionStorage();
     for(let i=0;i<6;i++)
     {
-        if(x==1)
+        let holdClass = gameValues.player[playerID].wurfel[i].hold;
+        if(holdClass){
+            $($("div img")[i]).addClass("hold")
+        }
+        else{
+            $($("div img")[i]).removeClass("hold")
+        };
+
+        let lockedClass = gameValues.player[playerID].wurfel[i].locked;
+        if(lockedClass){
+            $($("div img")[i]).addClass("locked")
+        }
+        else{
+            $($("div img")[i]).removeClass("locked")
+        };
+        let countedClass = gameValues.player[playerID].wurfel[i].counted; 
+        if(countedClass){
+            $($("div img")[i]).addClass("counted")
+        }
+        else{
+            $($("div img")[i]).removeClass("counted")
+        };
+    }
+        // if(x==1)
         // is called when player clicks on dice, adds new class to the dice;
         // needed for analyze
-        {
-            let thisWuerfelHoldBool = gameValues.player[playerID].wurfel[i].hold;
-            if(thisWuerfelHoldBool)
-            {
-                $($("div img")[i]).addClass("hold");
-            }
-            else if(thisWuerfelHoldBool == false)
-            {
-                $($("div img")[i]).removeClass("hold");
-            }
-        }
+        // {
+        //     let thisWuerfelHoldBool = gameValues.player[playerID].wurfel[i].hold;
+        //     if(thisWuerfelHoldBool)
+        //     {
+        //         $($("div img")[i]).addClass("hold");
+        //     }
+        //     else if(thisWuerfelHoldBool == false)
+        //     {
+        //         $($("div img")[i]).removeClass("hold");
+        //     }
+        // }
         // if(x==2)    // is called when reroll unhold dice. x==2 -> adds locked class and removes hold class
         // {
         //     let thisWuerfelLockedBool = gameValues.player[playerID].wurfel[i].locked;
@@ -247,8 +264,8 @@ function applyGameValuesToUi(x)
         //         $($("div img")[i]).addClass("hold");
         //     }
         // }
-    }
-}
+    // }
+};
 
 function registerCounterListener()
 // registers a listener for each click, which analyzes the mom points
@@ -276,18 +293,12 @@ function registerButtonListener()
 {
 
     $("#knopf1").click(() => {rollUnholdDice2()});
-    $("#knopf2").click(() => 
-    {
-        if(isItMyTurn())
-        {
-            bank()
-        }
-    });
+    $("#knopf2").click(() => {bankPoints()});
     $("#knopf3").click(() => 
     {
         if(isItMyTurn())
         {
-            zilch(1)
+            zonk()
         }
     });
 }
@@ -299,9 +310,93 @@ function rollUnholdDice2()
         const gameId = myGameId();
         socket.emit('rollDice', gameId);
     }
-}
+};
 
 socket.on('unholdDiceRolled', (thisRoll) => {
     toSessionStorage(thisRoll);
-    
-})
+    const gameValues = fromSessionStorage();
+    const activePlayer = currentPlayerId();
+    for(let i=0; i<6; i++)
+    {
+        let dice = gameValues.player[activePlayer].wurfel[i].augenzahl;
+        assignNewPic(i, dice);
+        applyGameValuesToUi();
+    };
+});
+
+function bankPoints()
+{
+    if(isItMyTurn())
+    {
+        const gameId = myGameId();
+        socket.emit('bankPoints', gameId);
+    }
+    else(console.log("Bank: Du bist nicht dran"));
+}
+
+socket.on('bankPoints', (submit) => {
+    toSessionStorage(submit["gameValues"]);
+    const result = submit["result"];
+    const gameValues = fromSessionStorage();
+    const playerId = currentPlayerId();
+    const points = (gameValues.player[playerId].momPoints
+        + gameValues.player[playerId].holdPoints)
+    const tot = gameValues.player[playerId].totalPoints;
+    const durchg = gameValues.player[playerId].durchgang;
+    if(result==1){
+        alert("Schreiben ohne Punkte nicht möglich");
+    }
+    else if(result==2){
+        alert("Weniger als 400 Punkte kann man nicht schreiben");
+    }
+    else if(result==3){
+        alert("Gewonnen, mehr als 10'000 Punkte");
+    }
+    else if(result==4){
+        $("#punkteTabelle"+playerId+ " tr:last").after("<tr><td>"
+            + durchg + "</td><td>" + points + "</td><td>" + tot + "</td>");
+    };
+    applyGameValuesToUi();
+    resetClasses();
+});
+
+function resetClasses()
+{
+    if(isItMyTurn())
+    {
+        const gameId = myGameId();
+        socket.emit('resetClasses', gameId);
+    }
+};
+
+socket.on('nextPlayer', (thisRoll) => {
+    toSessionStorage(thisRoll);
+    applyGameValuesToUi();
+    const activePlayer = thisRoll.currentPlayerID;
+    const activePlayerName = thisRoll.player[activePlayer].name;
+    $("#spielerName1").text(activePlayerName);
+    for(let i=0; i<6; i++)
+    {
+        let dice = thisRoll.player[activePlayer].wurfel[i].augenzahl;
+        assignNewPic(i, dice);
+    };
+});
+
+function zonk()
+{
+    if(isItMyTurn())
+    {
+        const gameId = myGameId();
+        socket.emit('zonk', gameId);
+    }
+};
+
+socket.on('zonkConfirmed', (thisRoll) => {
+    toSessionStorage(thisRoll);
+    const gameValues = fromSessionStorage();
+    const playerId = currentPlayerId();
+    const durchg = gameValues.player[playerId].durchgang;
+    $("#punkteTabelle"+playerId+ " tr:last").after("<tr><td>"
+        + durchg + "</td><td> Zilch </td><td>"
+        + gameValues.player[playerId].totalPoints +"</td>");
+});

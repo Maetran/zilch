@@ -91,13 +91,21 @@ io.on('connection', (socket) => {
     });
 
     // Requested to hold 1 dice
-    socket.on('holdDiceRequest', (submit) => {
-        const playerId = submit["playerId"];
-        const gameId = submit["gameId"];
+    socket.on('holdDiceChangeRequest', (submit) => {
+        console.log("*** im hold changer *** ");
         const diceIndexToHold = submit["diceIndexToHold"];
-        console.log(diceIndexToHold);
-        activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].hold = true;
-        io.to(gameId).emit('confirmLock', (activeGames[gameId].session))
+        console.log("diceindextohold: " + diceIndexToHold);
+        const gameId = submit["gameId"];
+        console.log("gameId: " + gameId)
+        const playerId = getCurrentPlayer(gameId);
+        console.log("player id: " + playerId);
+
+        if(activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].locked != true)
+        {
+            activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].hold = !activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].hold;
+        }
+
+        io.to(gameId).emit('confirmHoldChange', (activeGames[gameId].session));
     });
 
     // Clicked on any dice, analyze if points
@@ -106,11 +114,30 @@ io.on('connection', (socket) => {
         io.to(gameId).emit('itWasCounted', (activeGames[gameId].session));
     });
 
-    // Regular roll of dice after holding
+    // Regular roll of dice after holding & clicking on button
     socket.on('rollDice', (gameId) => {
         rollUnholdDice(2, gameId);
         io.to(gameId).emit('unholdDiceRolled', (activeGames[gameId].session));
     })
+
+    // Bank rolled points to total points
+    socket.on('bankPoints', (gameId) => {
+        const result = bank(gameId);
+        const submit = {"gameValues": activeGames[gameId].session, "result":result}
+        io.to(gameId).emit('bankPoints', submit);
+    })
+
+    // Reqest of reset classes & initial countings for each dice
+    socket.on('resetClasses', (gameId) => {
+        zilch(gameId);
+        io.to(gameId).emit('nextPlayer', (activeGames[gameId].session));
+    })
+
+    // Zilch this roll ("Zonk")
+    socket.on('zonk', (gameId) => {
+        zonk(gameId);
+        io.to(gameId).emit('zonkConfirmed', (activeGames[gameId].session));
+    });
 
     // update list after player leaves
     socket.on('disconnect', () => {
@@ -148,7 +175,7 @@ function init(gameId)
                 "momPoints": 0,
                 "holdPoints": 0,
                 "totalPoints": 0,
-                "durchgang": 1,
+                "durchgang": 0,
                 "nextRollOK":true,
                 "wurfel": [
                     {"augenzahl": 2, "hold": false, "locked": false, "counted": false}, // dice 1-6
@@ -166,7 +193,7 @@ function init(gameId)
                 "momPoints": 0,
                 "holdPoints": 0,
                 "totalPoints": 0,
-                "durchgang": 1,
+                "durchgang": 0,
                 "nextRollOK":true,
                 "wurfel": [
                     {"augenzahl": 1, "hold": false, "locked": false, "counted": false}, // dice 1-6
@@ -188,14 +215,15 @@ function getCurrentPlayer(gameId)
     return activeGames[gameId].session.currentPlayerID;
 }
 
-function switchCurrentPlayer()
+function switchCurrentPlayer(gameId)
 {
-    gameValues.currentPlayerID = gameValues.currentPlayerID==0 ? 1 : 0;
+    activeGames[gameId].session.currentPlayerID = activeGames[gameId].session.currentPlayerID==0 ? 1 : 0;
+    console.log("Jetzt an der Reihe: " + activeGames[gameId].session.currentPlayerID);
 }
 
 function rollUnholdDice(x, gameId)
 // function called on game start and eventlistener
-// to reroll all not-checked dice ("noHold")
+// to reroll all not-checked dice ("noHold"), as well called after opponent finished his roll
 {
     console.log(activeGames);
     console.log(activeGames[gameId]);
@@ -239,17 +267,22 @@ function rollUnholdDice(x, gameId)
     if(x==2)
     // called after click on roll button
     {
-        let validator = [""];
+        console.log("*** im rollUnhold(2) ***");
+        const validator = [""];
         activeGames[gameId].session.player[playerID].wurfel.forEach(a=>{if(a.counted==false&&a.hold==true){validator.push("stop")}});
+        let holdLockedCounter = 0;
+        activeGames[gameId].session.player[playerID].wurfel.forEach(a=>(a.hold==true ? holdLockedCounter += 1 : 0));
+        activeGames[gameId].session.player[playerID].wurfel.forEach(a=>(a.locked==true ? holdLockedCounter += 1 : 0));
+        console.log("hold + locked: " + holdLockedCounter)
         if(activeGames[gameId].session.player[playerID].nextRollOK != true)
         {
-            alert("Du darfst Würfel ohne Punkteeinfluss nicht halten");
+            console.log("Du darfst Würfel ohne Punkteeinfluss nicht halten");
             activeGames[gameId].session.player[playerID].wurfel.forEach(a=>{if(a.hold==true&&a.counted==true){a.counted==false}});
             return;
         }
         else if(validator.includes("stop"))
         {
-            alert("Das geht so nicht!");
+            console.log("Das geht so nicht!");
             return;
         }
         else if(activeGames[gameId].session.player[playerID].wurfel.every(a=>a.hold==false)||activeGames[gameId].session.player[playerID].momPoints==0)    // checks if any dice is on hold
@@ -257,12 +290,11 @@ function rollUnholdDice(x, gameId)
             console.log("Du kannst nicht würfeln ohne zu halten");
             return;
         }
-        else if(($(".hold").length) + ($(".locked").length)==6)
+        else if(holdLockedCounter==6)
         {
             activeGames[gameId].session.player[playerID].holdPoints += activeGames[gameId].session.player[playerID].momPoints;
-            $("div img").removeClass();
             activeGames[gameId].session.player[playerID].wurfel.forEach(a=> {a.hold=false;a.locked=false});
-            rollUnholdDice(1);
+            rollUnholdDice(1); // TODO, think is not working atm
             return;
         }
         else
@@ -273,13 +305,11 @@ function rollUnholdDice(x, gameId)
                 if(a.hold == false && a.locked == false)
                 {
                     a.augenzahl = parseInt(Math.random() * 6 + 1);
-                    assignNewPic(i,a.augenzahl);
                 }
                 else if(a.hold == true)
                 {
                     a.hold = false;
                     a.locked = true;
-                    applyGameValuesToUi(2)
                 }
             })
         }
@@ -310,11 +340,11 @@ function analyze(gameId)
         {
             case "1":
                 activeGames[gameId].session.player[playerID].momPoints += 100 * y;
-                validateAsCounted(k, gameId, playerID) // TODO
+                validateAsCounted(k, gameId, playerID)
                 break;
             case "5":
                 activeGames[gameId].session.player[playerID].momPoints += 50 * y;
-                validateAsCounted(k, gameId, playerID) // TODO
+                validateAsCounted(k, gameId, playerID)
                 break;
         }
         if(y!=0)
@@ -396,59 +426,62 @@ function analyze(gameId)
     }
 }
 
-function zilch(x) // kind of reset
+function zonk(gameId)
 {
-    let playerID = getCurrentPlayer();
-    $("div img").removeClass();
-    gameValues.player[playerID].momPoints = 0;
-    gameValues.player[playerID].holdPoints = 0;
-    $("#punkteAnzeige").text(gameValues.player[playerID].momPoints);
-    gameValues.player[playerID].wurfel.forEach(a=> {a.hold=false;a.locked=false});
-
-    if(x==1)
-    {
-        let durchg = gameValues.player[playerID].durchgang;
-        $("#punkteTabelle"+playerID+ " tr:last").after("<tr><td>" + durchg + "</td><td> Zilch </td><td>" + gameValues.player[playerID].totalPoints +"</td>");
-        gameValues.player[playerID].durchgang += 1;
-    }
-    switchCurrentPlayer();
-    rollUnholdDice(1);
+    let playerId = getCurrentPlayer(gameId);
+    activeGames[gameId].session.player[playerId].momPoints = 0;
+    activeGames[gameId].session.player[playerId].holdPoints = 0;
+    activeGames[gameId].session.player[playerId].wurfel
+        .forEach(a=> {a.hold=false;a.locked=false;a.counted=false});  
+    activeGames[gameId].session.player[playerId].durchgang += 1;
+    switchCurrentPlayer(gameId);
+    rollUnholdDice(1, gameId);
 }
 
-function bank()
+function zilch(gameId) // reset classes and countings of round
 {
-    let playerID = getCurrentPlayer();
-    let tot = gameValues.player[playerID].totalPoints;
-    let hold = gameValues.player[playerID].holdPoints;
-    let mom = gameValues.player[playerID].momPoints;
-    let durchg = gameValues.player[playerID].durchgang;
+    let playerID = getCurrentPlayer(gameId);
+    activeGames[gameId].session.player[playerID].momPoints = 0;
+    activeGames[gameId].session.player[playerID].holdPoints = 0;
+    activeGames[gameId].session.player[playerID].wurfel
+        .forEach(a=> {a.hold=false;a.locked=false;a.counted=false});
+
+    switchCurrentPlayer(gameId);
+    rollUnholdDice(1, gameId);
+}
+
+function bank(gameId)
+{
+    console.log("*** in Bank function ***");
+    let playerId = getCurrentPlayer(gameId);
+    let tot = activeGames[gameId].session.player[playerId].totalPoints;
+    let hold = activeGames[gameId].session.player[playerId].holdPoints;
+    let mom = activeGames[gameId].session.player[playerId].momPoints;
     if(mom==0)
     {
-        alert("Du kannst nicht schreiben ohne erst Punkte zu halten");
-        return;
+        console.log("Du kannst nicht schreiben ohne erst Punkte zu halten");
+        return 1;
     }
     else if((hold+mom)<400)
     {
-        alert("Du kannst weniger als 400 Punkte nicht schreiben");
-        return;
+        console.log("Du kannst weniger als 400 Punkte nicht schreiben");
+        return 2;
     }
     else
     {
-        gameValues.player[playerID].durchgang += 1;
+        activeGames[gameId].session.player[playerId].durchgang += 1;
         tot += hold + mom;
-        gameValues.player[playerID].totalPoints = tot;
+        activeGames[gameId].session.player[playerId].totalPoints = tot;
         if(tot >= 10000)
         {
-            alert("Du hast gewonnen, mehr als 10'000 Pkte");
+            console.log("Du hast gewonnen, mehr als 10'000 Pkte");
             tot = 0;
-            $("#punkteTotal").text(tot);
-            zilch();
+            return 3;
         }
         else
         {
-            let playerID = getCurrentPlayer();
-            $("#punkteTabelle"+playerID+ " tr:last").after("<tr><td>" + durchg + "</td><td>" + (mom + hold) + "</td><td>" + tot + "</td>");
-            zilch();
+            console.log("Punkte werden angeschrieben");
+            return 4;
         }
     }
 };
