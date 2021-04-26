@@ -99,44 +99,53 @@ io.on('connection', (socket) => {
         console.log("gameId: " + gameId)
         const playerId = getCurrentPlayer(gameId);
         console.log("player id: " + playerId);
-
-        if(activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].locked != true)
+        if(isItMyTurn(gameId, socket.id))
         {
-            activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].hold = !activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].hold;
-        }
-
-        io.to(gameId).emit('confirmHoldChange', (activeGames[gameId].session));
+            if(activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].locked != true)
+            {
+                activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].hold = !activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].hold;
+            };
+            io.to(gameId).emit('confirmHoldChange', (activeGames[gameId].session));
+        };
     });
 
     // Clicked on any dice, analyze if points
     socket.on('analyze', (gameId) => {
-        analyze(gameId);
-        io.to(gameId).emit('itWasCounted', (activeGames[gameId].session));
+        if(isItMyTurn(gameId, socket.id))
+        {
+            analyze(gameId);
+            io.to(gameId).emit('itWasCounted', (activeGames[gameId].session));
+        };
     });
 
     // Regular roll of dice after holding & clicking on button
     socket.on('rollDice', (gameId) => {
-        rollUnholdDice(2, gameId);
-        io.to(gameId).emit('unholdDiceRolled', (activeGames[gameId].session));
+        if(isItMyTurn(gameId, socket.id))
+        {
+            rollUnholdDice(2, gameId);
+            io.to(gameId).emit('unholdDiceRolled', (activeGames[gameId].session));
+        }
     })
 
     // Bank rolled points to total points
     socket.on('bankPoints', (gameId) => {
-        const result = bank(gameId);
-        const submit = {"gameValues": activeGames[gameId].session, "result":result}
-        io.to(gameId).emit('bankPoints', submit);
+        console.log("bank points: " + activeGames[gameId].session.currentPlayerID)
+        if(isItMyTurn(gameId, socket.id))
+        {
+            const result = bank(gameId);
+            const submit = {"gameValues": activeGames[gameId].session, "result":result}
+            io.to(gameId).emit('bankPoints', submit);
+        }
     })
 
     // Reqest of reset classes & initial countings for each dice
-    socket.on('resetClasses', (gameId) => {
-        zilch(gameId);
-        io.to(gameId).emit('nextPlayer', (activeGames[gameId].session));
-    })
-
-    // Zilch this roll ("Zonk")
-    socket.on('zonk', (gameId) => {
-        zonk(gameId);
-        io.to(gameId).emit('zonkConfirmed', (activeGames[gameId].session));
+    socket.on('zilch', (gameId) => {
+        console.log("socket on zilch: " + activeGames[gameId].session.currentPlayerID)
+        if(isItMyTurn(gameId, socket.id))
+        {
+            zilch(gameId);
+            io.to(gameId).emit('nextPlayer', (activeGames[gameId].session));
+        }
     });
 
     // update list after player leaves
@@ -161,6 +170,13 @@ server.listen(3003, () => {
 });
 
 /// *** GAME LOGIC STARTS
+
+function isItMyTurn(gameId, socketId)
+{
+    console.log("is it my turn: " + activeGames[gameId].session.currentPlayerID)
+    const currentPlayer = activeGames[gameId].session.currentPlayerID;
+    return activeGames[gameId].session.player[currentPlayer].socketId == socketId;
+}
 
 function init(gameId)
 {
@@ -217,6 +233,7 @@ function getCurrentPlayer(gameId)
 
 function switchCurrentPlayer(gameId)
 {
+    console.log("switch current player: " + activeGames[gameId].session.currentPlayerID)
     activeGames[gameId].session.currentPlayerID = activeGames[gameId].session.currentPlayerID==0 ? 1 : 0;
     console.log("Jetzt an der Reihe: " + activeGames[gameId].session.currentPlayerID);
 }
@@ -225,16 +242,15 @@ function rollUnholdDice(x, gameId)
 // function called on game start and eventlistener
 // to reroll all not-checked dice ("noHold"), as well called after opponent finished his roll
 {
-    console.log(activeGames);
-    console.log(activeGames[gameId]);
-    console.log(activeGames[gameId].session);
     console.log(activeGames[gameId].session);
     console.log(activeGames[gameId].session.currentPlayerID);
+    console.log("roll unhold dice: " + activeGames[gameId].session.currentPlayerID)
 
     let playerID = getCurrentPlayer(gameId);
     if(x==1)
     //new set of 6 dice
     {
+        console.log("*** im rollunhold(1) ***")
         for(let i=0; i<6; i++)
         {
             let newWuerfel = parseInt(Math.random() * 6 + 1);
@@ -324,6 +340,7 @@ function validateAsCounted(x, gameId, playerID)
 function analyze(gameId)
 // is called any time a dice is selected or unselected and analyzes the mom points
 {
+    console.log("analyze: " + activeGames[gameId].session.currentPlayerID)
     const playerID = getCurrentPlayer(gameId);
     activeGames[gameId].session.player[playerID].momPoints = 0;
     activeGames[gameId].session.player[playerID].nextRollOK = true;
@@ -426,26 +443,15 @@ function analyze(gameId)
     }
 }
 
-function zonk(gameId)
+function zilch(gameId) // reset classes and countings of round
 {
+    console.log("zilch funct: " + activeGames[gameId].session.currentPlayerID)
     let playerId = getCurrentPlayer(gameId);
     activeGames[gameId].session.player[playerId].momPoints = 0;
     activeGames[gameId].session.player[playerId].holdPoints = 0;
     activeGames[gameId].session.player[playerId].wurfel
-        .forEach(a=> {a.hold=false;a.locked=false;a.counted=false});  
-    activeGames[gameId].session.player[playerId].durchgang += 1;
-    switchCurrentPlayer(gameId);
-    rollUnholdDice(1, gameId);
-}
-
-function zilch(gameId) // reset classes and countings of round
-{
-    let playerID = getCurrentPlayer(gameId);
-    activeGames[gameId].session.player[playerID].momPoints = 0;
-    activeGames[gameId].session.player[playerID].holdPoints = 0;
-    activeGames[gameId].session.player[playerID].wurfel
         .forEach(a=> {a.hold=false;a.locked=false;a.counted=false});
-
+    activeGames[gameId].session.player[playerId].durchgang += 1;
     switchCurrentPlayer(gameId);
     rollUnholdDice(1, gameId);
 }
@@ -453,6 +459,7 @@ function zilch(gameId) // reset classes and countings of round
 function bank(gameId)
 {
     console.log("*** in Bank function ***");
+    console.log("bank funct: " + activeGames[gameId].session.currentPlayerID)
     let playerId = getCurrentPlayer(gameId);
     let tot = activeGames[gameId].session.player[playerId].totalPoints;
     let hold = activeGames[gameId].session.player[playerId].holdPoints;
