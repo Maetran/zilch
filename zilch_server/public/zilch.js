@@ -48,6 +48,8 @@ socket.on('showAllGames', (activeGames) => {
     };
 });
 
+//<------------------------------------------------------------------------>
+
 function createGame()
 {
     const userGameName = prompt("Gib deinem Spiel einen Namen:");
@@ -81,23 +83,19 @@ socket.on('joinRequestAnswer', (gameId) => {
     newLeaveButton.innerHTML = "Dieses Spiel beenden";
     newLeaveButton.setAttribute('onclick', 'leaveGame("' + gameId + '")');
     $('#leaveGameButton').append(newLeaveButton);
-    const buttonText = $('#'+gameId).text();
-    const submit = {"gameId":gameId, "buttonText":buttonText};
-    socket.emit('gameFull', submit);
+    socket.emit('gameFull', gameId);
 });
 
-socket.on('gameStart', (gameId) => {
+socket.on('gameStart', (submit) => {
   alert("Dein Spiel startet");
-  socket.emit('init', gameId);
+  toSessionStorage(submit["gameValues"]);
+  const gameValues = submit["gameValues"];
+  $("#namePlayer1").text(gameValues.player[0].name);
+  $("#namePlayer2").text(gameValues.player[1].name);
+  socket.emit('requestFirstRoll', submit["gameId"]);
 });
 
 location.hash = '';
-
-socket.on('nameToCountTable', (gameValues) => {
-    $("#namePlayer1").text(gameValues.player[0].name);
-    $("#namePlayer2").text(gameValues.player[1].name);
-    socket.emit('requestFirstRoll', (gameValues["gameCode"]));
-});
 
 socket.on('firstRollToUi', (thisRoll) => {
     const activePlayer = thisRoll.currentPlayerID;
@@ -113,6 +111,20 @@ socket.on('firstRollToUi', (thisRoll) => {
     sessionStorage.setItem("myId", myId);
     toSessionStorage(thisRoll);
 });
+
+//<------------------------------------------------------------------------>
+
+function newDicePics()
+{
+    const gameValues = fromSessionStorage();
+    const activePlayer = currentPlayerId();
+    for(let i=0; i<6; i++)
+    {
+        let dice = gameValues.player[activePlayer].wurfel[i].augenzahl;
+        assignNewPic(i, dice);
+        applyGameValuesToUi();
+    };
+}
 
 function bilder(x)
 // provides link to the pictures needed to display
@@ -148,6 +160,8 @@ function assignNewPic(i, x)
     $("#wuerfel" + counters[i]).attr("src", bilder(x));
 };
 
+//<------------------------------------------------------------------------>
+
 function toSessionStorage(thisRoll)
 {
     sessionStorage.setItem("gameValues", JSON.stringify(thisRoll));
@@ -158,13 +172,7 @@ function fromSessionStorage()
     return JSON.parse(sessionStorage.gameValues)
 }
 
-function isItMyTurn()
-{
-    // return true;
-    // let currPlayer = currentPlayerId();
-    // if(currPlayer==(sessionStorage.getItem("myId"))){return true}
-    // else{return false};
-}
+//<------------------------------------------------------------------------>
 
 function myPlayerId()
 {
@@ -180,6 +188,8 @@ function myGameId()
 {
     return JSON.parse(sessionStorage.gameValues).gameCode;
 }
+
+//<------------------------------------------------------------------------>
 
 function holdListener()
 // registers a listener to the document - needed for each click on a dice
@@ -279,6 +289,7 @@ socket.on('itWasCounted', (thisRoll) => {
     $("#punkteAnzeige").text(gameValues.player[playerID].momPoints+gameValues.player[playerID].holdPoints);
 })
 
+
 function registerButtonListener()
 // registers a listener for the buttons and fires events
 {
@@ -287,7 +298,9 @@ function registerButtonListener()
     $("#knopf2").click(() => {bankPoints()});
     $("#knopf3").click(() => {zilch()}
     );
-}
+};
+
+//<------------------------------------------------------------------------>
 
 function rollUnholdDice2()
 {
@@ -300,33 +313,21 @@ socket.on('unholdDiceRolled', (thisRoll) => {
     newDicePics()
 });
 
-function newDicePics()
-{
-    const gameValues = fromSessionStorage();
-    const activePlayer = currentPlayerId();
-    for(let i=0; i<6; i++)
-    {
-        let dice = gameValues.player[activePlayer].wurfel[i].augenzahl;
-        assignNewPic(i, dice);
-        applyGameValuesToUi();
-    };
-}
+//<------------------------------------------------------------------------>
 
 function bankPoints()
 {
     const gameId = myGameId();
     socket.emit('bankPoints', gameId);
-}
+};
 
 socket.on('bankPoints', (submit) => {
-    toSessionStorage(submit["gameValues"]);
     const result = submit["result"];
     const gameValues = fromSessionStorage();
     const playerId = currentPlayerId();
     const points = (gameValues.player[playerId].momPoints
         + gameValues.player[playerId].holdPoints)
     const tot = gameValues.player[playerId].totalPoints;
-    const durchg = gameValues.player[playerId].durchgang;
     if(result==1){
         alert("Schreiben ohne Punkte nicht möglich");
     }
@@ -337,31 +338,57 @@ socket.on('bankPoints', (submit) => {
         alert("Gewonnen, mehr als 10'000 Punkte");
     }
     else if(result==4){
+        const durchg = gameValues.player[playerId].durchgang;
         $("#punkteTabelle"+playerId+ " tr:last").after("<tr><td>"
             + durchg + "</td><td>" + points + "</td><td>" + tot + "</td>");
-        zilch();
-        applyGameValuesToUi();
+        toSessionStorage(submit["gameValues"]);
+        resetAfterBank();
     };
 });
 
-socket.on('nextPlayer', (thisRoll) => {
-    toSessionStorage(thisRoll);
-    applyGameValuesToUi();
-    const playerId = currentPlayerId();
-    const gameValues = fromSessionStorage();
-    const activePlayer = thisRoll.currentPlayerID;
-    const activePlayerName = thisRoll.player[activePlayer].name;
-    const durchg = gameValues.player[playerId].durchgang;
-    $("#spielerName1").text(activePlayerName);
-    $("#punkteTabelle"+playerId+ " tr:last").after("<tr><td>"
-        + durchg + "</td><td> Zilch </td><td>"
-        + gameValues.player[playerId].totalPoints +"</td>");
-    newDicePics();
-    applyGameValuesToUi();
-});
-
-function zilch()
+function resetAfterBank()
 {
     const gameId = myGameId();
-    socket.emit('zilch', gameId);
+    socket.emit('resetAfterBank', gameId);
 };
+
+socket.on('resetAfterBankOk', (thisRoll) => {
+    toSessionStorage(thisRoll);
+    applyGameValuesToUi();
+    switchPlayer();
+});
+
+function switchPlayer()
+{
+    const gameId = myGameId();
+    socket.emit('switchPlayer', gameId);
+};
+
+socket.on('switchPlayerOk', (thisRoll) => {
+    toSessionStorage(thisRoll);
+    newDicePics();
+    applyGameValuesToUi();
+    const activePlayer = thisRoll.currentPlayerID;
+    const activePlayerName = thisRoll.player[activePlayer].name;
+    $("#spielerName1").text(activePlayerName);
+});
+
+//<------------------------------------------------------------------------>
+//<------------------------------------------------------------------------>
+
+// function zilch()
+// {
+//     const gameId = myGameId();
+//     socket.emit('zilch', gameId);
+// };
+
+//<------------------------------------------------------------------------>
+
+
+
+//  const playerId = currentPlayerId();
+//  const gameValues = fromSessionStorage();
+//  const durchg = gameValues.player[playerId].durchgang;
+//  $("#punkteTabelle"+playerId+ " tr:last").after("<tr><td>"
+//      + durchg + "</td><td> Zilch </td><td>"
+//      + gameValues.player[playerId].totalPoints +"</td>");

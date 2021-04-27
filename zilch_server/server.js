@@ -54,40 +54,36 @@ io.on('connection', (socket) => {
         {
             if(k==gameId)
             {
-                console.log("game id vorhanden: " + gameId + ", k: " + k + ". Einstieg ins Spiel möglich");
+                console.log("game id vorhanden: " + gameId + ", k: " + k
+                    + ". Einstieg ins Spiel möglich");
                 socket.emit('joinRequestAnswer', gameId);
             }
         }
     });
 
   // Mark game as full (opened Game got 2nd Player)
-  socket.on('gameFull', (submit) => {
+  socket.on('gameFull', gameId => {
     const playerName = allUsers[socket.id];
-    const gameId = submit["gameId"];
     console.log("Aktive Spiele anzeigen: " + activeGames);
+    console.log("Aktive Spiele anzeigen: " + activeGames[gameId]);
+    console.log("Aktive Spiele anzeigen: " + activeGames[gameId].players);
     console.log("Game Id beigetreten: " + gameId);
     activeGames[gameId].players.push({"name":playerName, "socketId": socket.id, "currentPlayer":1});
     console.log("dein spielername in dieser id: " + activeGames[gameId].players[1].name);
     socket.join(gameId);
-    io.emit('gameNowFull', gameId);
-    io.to(gameId).emit('gameStart', gameId);
+    const gameValues = init(gameId);
+    const submit = {"gameValues":gameValues, "gameId":gameId} 
+    io.to(gameId).emit('gameStart', submit);
     activeGames[gameId]["gameFull"] = "full";
-    console.log(activeGames[gameId].gameFull);
     io.emit('showAllGames', activeGames);
-  });
-
-  // Init values
-    socket.on('init', (gameId) => {
-        const mySocketId = socket.id;
-        const gameValues = init(gameId, mySocketId); 
-        io.to(gameId).emit('nameToCountTable', gameValues);
   });
 
     // First roll requested
     socket.on('requestFirstRoll', (gameId) => {
+        console.log("*** request first roll *** + " + getCurrentPlayer(gameId));
         rollUnholdDice(1, gameId);
-        const firstRollValues = activeGames[gameId].session;
-        io.to(gameId).emit('firstRollToUi', (firstRollValues));
+        const gameValues = activeGames[gameId].session;
+        io.to(gameId).emit('firstRollToUi', (gameValues));
     });
 
     // Requested to hold 1 dice
@@ -138,14 +134,33 @@ io.on('connection', (socket) => {
         }
     })
 
-    // Reqest of reset classes & initial countings for each dice
-    socket.on('zilch', (gameId) => {
-        console.log("socket on zilch: " + activeGames[gameId].session.currentPlayerID)
+    // // Reqest of reset classes & initial countings for each dice
+    // socket.on('zilch', (gameId) => {
+    //     console.log("socket on zilch: " + activeGames[gameId].session.currentPlayerID)
+    //     if(isItMyTurn(gameId, socket.id))
+    //     {
+    //         zilch(gameId);
+    //         io.to(gameId).emit('nextPlayer', (activeGames[gameId].session));
+    //     }
+    // });
+
+    // Reset game attr after banking points
+    socket.on('resetAfterBank', gameId => {
+        resetAfterBank(gameId);
+        const gameValues = activeGames[gameId].session;
+        io.to(gameId).emit('resetAfterBankOk', gameValues);
+    });
+
+    // Request to switch player
+    socket.on('switchPlayer', gameId => {
+        console.log("player vor switch: " + getCurrentPlayer(gameId));
         if(isItMyTurn(gameId, socket.id))
         {
-            zilch(gameId);
-            io.to(gameId).emit('nextPlayer', (activeGames[gameId].session));
+            rollUnholdDice(1, gameId);
         }
+        console.log("player nach switch: " + getCurrentPlayer(gameId));
+        const gameValues = activeGames[gameId].session;
+        io.to(gameId).emit('switchPlayerOk', gameValues);
     });
 
     // update list after player leaves
@@ -191,7 +206,7 @@ function init(gameId)
                 "momPoints": 0,
                 "holdPoints": 0,
                 "totalPoints": 0,
-                "durchgang": 0,
+                "durchgang": 1,
                 "nextRollOK":true,
                 "wurfel": [
                     {"augenzahl": 2, "hold": false, "locked": false, "counted": false}, // dice 1-6
@@ -209,7 +224,7 @@ function init(gameId)
                 "momPoints": 0,
                 "holdPoints": 0,
                 "totalPoints": 0,
-                "durchgang": 0,
+                "durchgang": 1,
                 "nextRollOK":true,
                 "wurfel": [
                     {"augenzahl": 1, "hold": false, "locked": false, "counted": false}, // dice 1-6
@@ -251,7 +266,7 @@ function rollUnholdDice(x, gameId)
     //new set of 6 dice
     {
         console.log("*** im rollunhold(1) ***")
-        for(let i=0; i<6; i++)
+        for(let i=0; i<2; i++)
         {
             let newWuerfel = parseInt(Math.random() * 6 + 1);
             activeGames[gameId].session.player[playerID].wurfel[i].augenzahl = newWuerfel;
@@ -277,9 +292,9 @@ function rollUnholdDice(x, gameId)
     //             $("#punkteAnzeige").text(gameValues.player[playerID].momPoints);
     //             $("#sondertext").text("Du hast NICHTS gewürfelt. Los - nochmal. Gibt 500 extra Looser Punkte");
     //         }
-        // }
     // }
-
+    // }
+    
     if(x==2)
     // called after click on roll button
     {
@@ -310,7 +325,7 @@ function rollUnholdDice(x, gameId)
         {
             activeGames[gameId].session.player[playerID].holdPoints += activeGames[gameId].session.player[playerID].momPoints;
             activeGames[gameId].session.player[playerID].wurfel.forEach(a=> {a.hold=false;a.locked=false});
-            rollUnholdDice(1); // TODO, think is not working atm
+            // rollUnholdDice(1); // TODO, think is not working atm
             return;
         }
         else
@@ -320,7 +335,7 @@ function rollUnholdDice(x, gameId)
             (activeGames[gameId].session.player[playerID].wurfel).forEach((a,i) => {
                 if(a.hold == false && a.locked == false)
                 {
-                    a.augenzahl = parseInt(Math.random() * 6 + 1);
+                    a.augenzahl = parseInt(Math.random() * 2 + 1);
                 }
                 else if(a.hold == true)
                 {
@@ -331,9 +346,9 @@ function rollUnholdDice(x, gameId)
         }
     }
 }
-
-function validateAsCounted(x, gameId, playerID)
-{
+                
+                function validateAsCounted(x, gameId, playerID)
+                {
     activeGames[gameId].session.player[playerID].wurfel.forEach(a=>{if(a.hold==true && a.augenzahl==x){a.counted=true}});
 }
 
@@ -443,18 +458,28 @@ function analyze(gameId)
     }
 }
 
-function zilch(gameId) // reset classes and countings of round
+function resetAfterBank(gameId)
 {
-    console.log("zilch funct: " + activeGames[gameId].session.currentPlayerID)
-    let playerId = getCurrentPlayer(gameId);
+    console.log("reset after bank funct: " + activeGames[gameId].session.currentPlayerID)
+    const playerId = getCurrentPlayer(gameId);
     activeGames[gameId].session.player[playerId].momPoints = 0;
     activeGames[gameId].session.player[playerId].holdPoints = 0;
     activeGames[gameId].session.player[playerId].wurfel
         .forEach(a=> {a.hold=false;a.locked=false;a.counted=false});
-    activeGames[gameId].session.player[playerId].durchgang += 1;
-    switchCurrentPlayer(gameId);
-    rollUnholdDice(1, gameId);
+
 }
+
+// function zilch(gameId) // reset classes and countings of round
+// {
+//     console.log("zilch funct: " + activeGames[gameId].session.currentPlayerID)
+//     const playerId = getCurrentPlayer(gameId);
+//     activeGames[gameId].session.player[playerId].momPoints = 0;
+//     activeGames[gameId].session.player[playerId].holdPoints = 0;
+//     activeGames[gameId].session.player[playerId].wurfel
+//         .forEach(a=> {a.hold=false;a.locked=false;a.counted=false});
+//     activeGames[gameId].session.player[playerId].durchgang += 1;
+//     rollUnholdDice(1, gameId);
+// }
 
 function bank(gameId)
 {
@@ -476,6 +501,7 @@ function bank(gameId)
     }
     else
     {
+        console.log("*** DURCHGANG UM 1 ERHÖHT ***");
         activeGames[gameId].session.player[playerId].durchgang += 1;
         tot += hold + mom;
         activeGames[gameId].session.player[playerId].totalPoints = tot;
@@ -488,6 +514,7 @@ function bank(gameId)
         else
         {
             console.log("Punkte werden angeschrieben");
+            switchCurrentPlayer(gameId);
             return 4;
         }
     }
