@@ -267,7 +267,7 @@ function rollUnholdDice(x, gameId)
     //new set of 6 dice
     {
         console.log("*** im rollunhold(1) ***")
-        for(let i=0; i<2; i++)
+        for(let i=0; i<6; i++)
         {
             let newWuerfel = parseInt(Math.random() * 6 + 1);
             activeGames[gameId].session.player[playerID].wurfel[i].augenzahl = newWuerfel;
@@ -326,7 +326,7 @@ function rollUnholdDice(x, gameId)
         {
             activeGames[gameId].session.player[playerID].holdPoints += activeGames[gameId].session.player[playerID].momPoints;
             activeGames[gameId].session.player[playerID].wurfel.forEach(a=> {a.hold=false;a.locked=false});
-            // rollUnholdDice(1); // TODO, think is not working atm
+            rollUnholdDice(1, gameId); // TODO, think is not working atm
             return;
         }
         else
@@ -336,7 +336,7 @@ function rollUnholdDice(x, gameId)
             (activeGames[gameId].session.player[playerID].wurfel).forEach((a,i) => {
                 if(a.hold == false && a.locked == false)
                 {
-                    a.augenzahl = parseInt(Math.random() * 2 + 1);
+                    a.augenzahl = parseInt(Math.random() * 6 + 1);
                 }
                 else if(a.hold == true)
                 {
