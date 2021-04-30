@@ -296,8 +296,7 @@ function registerButtonListener()
 
     $("#knopf1").click(() => {rollUnholdDice2()});
     $("#knopf2").click(() => {bankPoints()});
-    $("#knopf3").click(() => {zilch()}
-    );
+    $("#knopf3").click(() => {zilch()});
 };
 
 //<------------------------------------------------------------------------>
