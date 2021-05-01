@@ -3,9 +3,7 @@ const app = express();
 const http = require('http');
 const server = http.createServer(app);
 const io = require('socket.io')(server);
-const allUsers = new Object();
-const activeGames = new Object();
-const logic = require('./logic');
+const {registerPlayer, createNewGame, joinRequest, gameFull, requestFirstRoll, allUsers, activeGames,} = require('./services');
 
 // *** Example of game values structure
 // activeGames = {[gameId]:{"userGameName":gameName,
@@ -21,75 +19,44 @@ app.get('/', (req, res) => {
 
 // First connect and adding user to allUsers - Object; send back Userlist to io
 io.on('connection', (socket) => {
-  // Register new Player to allUsers
-  socket.on('registerPlayer', (user) => {
-    allUsers[socket.id] = user;
-    io.emit('updatePlayerList', allUsers);
-    socket.emit('showAllGames', activeGames);
-  });
 
-
-  // learning to use require, can be deleted afterwards
-  socket.on('lerneExport', () => {
-      console.log(lernen());
-  });
-
-
-  // Create new Game
-  socket.on('createNewGame', (userGameName) => {
-    const gameId = "game" + socket.id;
-    const playerName = allUsers[socket.id];
-    socket.join(gameId);
-    activeGames[gameId] = {"userGameName":userGameName};
-    activeGames[gameId]["players"] = [{"name":playerName, "socketId": socket.id, "currentPlayer":0}];
-    console.log("dein spielername in dieser id: " + activeGames[gameId].players[0].name);
-    const gameParams = {"gameId": gameId, "name": userGameName};
-    activeGames[gameId]["gameFull"] = "notFull";
-    socket.emit('joinedGame', gameParams);
-    io.emit('showAllGames', activeGames);
-  });
-
-  // Leave current Game
-  socket.on('leaveGame', (gameId) => {
-    socket.leave(gameId);
-    socket.to(gameId).emit('leftGame');
-  });
-
-  // Checking if game is available for 2nd player
-    socket.on('joinRequest', (gameId) => {
-        for(k in activeGames)
-        {
-            if(k==gameId)
-            {
-                console.log("game id vorhanden: " + gameId + ", k: " + k
-                    + ". Einstieg ins Spiel möglich");
-                socket.emit('joinRequestAnswer', gameId);
-            }
-        }
+    // Register new Player to allUsers
+    socket.on('registerPlayer', (user) => {
+        const {allUsers, activeGames} = registerPlayer(user, socket.id);
+        io.emit('updatePlayerList', allUsers);
+        socket.emit('showAllGames', activeGames);
     });
 
-  // Mark game as full (opened Game got 2nd Player)
-  socket.on('gameFull', gameId => {
-    const playerName = allUsers[socket.id];
-    console.log("Aktive Spiele anzeigen: " + activeGames);
-    console.log("Aktive Spiele anzeigen: " + activeGames[gameId]);
-    console.log("Aktive Spiele anzeigen: " + activeGames[gameId].players);
-    console.log("Game Id beigetreten: " + gameId);
-    activeGames[gameId].players.push({"name":playerName, "socketId": socket.id, "currentPlayer":1});
-    console.log("dein spielername in dieser id: " + activeGames[gameId].players[1].name);
-    socket.join(gameId);
-    const gameValues = init(gameId);
-    const submit = {"gameValues":gameValues, "gameId":gameId} 
-    io.to(gameId).emit('gameStart', submit);
-    activeGames[gameId]["gameFull"] = "full";
-    io.emit('showAllGames', activeGames);
-  });
+    // Create new Game
+    socket.on('createNewGame', (userGameName) => {
+        const {gameParams, activeGames, gameId} = createNewGame(userGameName, socket.id);
+        socket.join(gameId);
+        socket.emit('joinedGame', gameParams);
+        io.emit('showAllGames', activeGames);
+    });
+
+    // Leave current Game
+    socket.on('leaveGame', (gameId) => {
+        socket.leave(gameId);
+        socket.to(gameId).emit('leftGame');  // NOT FINISHED, TODO
+    });
+
+    // Checking if game is available for 2nd player
+    socket.on('joinRequest', (gameId) => {
+        if(joinRequest(gameId)){socket.emit('joinRequestAnswer', gameId)};
+    });
+
+    // Mark game as full (opened Game got 2nd Player)
+    socket.on('gameFull', gameId => {
+        const submit = {"gameValues":gameFull(gameId, socket.id), "gameId":gameId} 
+        socket.join(gameId);
+        io.to(gameId).emit('gameStart', submit);
+        io.emit('showAllGames', activeGames);
+    });
 
     // First roll requested
     socket.on('requestFirstRoll', (gameId) => {
-        console.log("*** request first roll *** + " + getCurrentPlayer(gameId));
-        rollUnholdDice(1, gameId);
-        const gameValues = activeGames[gameId].session;
+        const gameValues = requestFirstRoll(gameId);
         io.to(gameId).emit('firstRollToUi', (gameValues));
     });
 
@@ -116,7 +83,7 @@ io.on('connection', (socket) => {
     socket.on('analyze', (gameId) => { 
         if(isItMyTurn(gameId, socket.id))
         {
-            logic.analyze(gameId);
+            analyze(gameId);
             io.to(gameId).emit('itWasCounted', (activeGames[gameId].session));
         };
     });
@@ -200,54 +167,6 @@ function isItMyTurn(gameId, socketId)
     console.log("is it my turn: " + activeGames[gameId].session.currentPlayerID)
     const currentPlayer = activeGames[gameId].session.currentPlayerID;
     return activeGames[gameId].session.player[currentPlayer].socketId == socketId;
-}
-
-function init(gameId)
-{
-    const gameValues = {
-        "gameCode": gameId,
-        "currentPlayerID": 0,
-        "player": [
-            {
-                "playerID": 0,
-                "name": activeGames[gameId].players[0].name,
-                "socketId": activeGames[gameId].players[0].socketId,
-                "momPoints": 0,
-                "holdPoints": 0,
-                "totalPoints": 0,
-                "durchgang": 0,
-                "nextRollOK":true,
-                "wurfel": [
-                    {"augenzahl": 2, "hold": false, "locked": false, "counted": false}, // dice 1-6
-                    {"augenzahl": 2, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 5, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 4, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 5, "hold": false, "locked": false, "counted": false}
-                ]
-            },
-            {
-                "playerID": 1,
-                "name": activeGames[gameId].players[1].name,
-                "socketId": activeGames[gameId].players[1].socketId,
-                "momPoints": 0,
-                "holdPoints": 0,
-                "totalPoints": 0,
-                "durchgang": 0,
-                "nextRollOK":true,
-                "wurfel": [
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false}, // dice 1-6
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false},
-                    {"augenzahl": 1, "hold": false, "locked": false, "counted": false}
-                ]
-            }
-        ]
-    };
-    activeGames[gameId].session = gameValues;
-    return gameValues;
 }
 
 function getCurrentPlayer(gameId)
@@ -354,7 +273,113 @@ function rollUnholdDice(x, gameId)
         }
     }
 }
-                
+       
+function analyze(gameId)
+// is called any time a dice is selected or unselected and analyzes the mom points
+{
+    console.log("analyze: " + activeGames[gameId].session.currentPlayerID)
+    const playerID = getCurrentPlayer(gameId);
+    activeGames[gameId].session.player[playerID].momPoints = 0;
+    activeGames[gameId].session.player[playerID].nextRollOK = true;
+    const holdDiceWithOccurence = activeGames[gameId].session.player[playerID].wurfel
+        .filter(wurfel=>wurfel.hold)
+        .reduce((holdDiceMap,wurfel)=>{
+            holdDiceMap[wurfel.augenzahl] += 1;
+        return holdDiceMap;
+    },{1:0,2:0,3:0,4:0,5:0,6:0})
+    for(k in holdDiceWithOccurence)
+    {
+        let y = holdDiceWithOccurence[k]; // y for readability - gives the occurence of one specific dice as number
+        switch(k)
+        {
+            case "1":
+                activeGames[gameId].session.player[playerID].momPoints += 100 * y;
+                validateAsCounted(k, gameId, playerID)
+                break;
+            case "5":
+                activeGames[gameId].session.player[playerID].momPoints += 50 * y;
+                validateAsCounted(k, gameId, playerID)
+                break;
+        }
+        if(y!=0)
+        {
+            let holdDice = [];
+            for(let j=0;j<6;j++)
+            {
+                if(activeGames[gameId].session.player[playerID].wurfel[j].hold == true)
+                {
+                    holdDice.push(activeGames[gameId].session.player[playerID].wurfel[j].augenzahl);
+                }
+            }
+
+            let isStreet = [1,2,3,4,5,6].every((val,ind)=>val===holdDice[ind])        // checks if user rolled a straight 1-6 == 2000 points
+
+            if(isStreet)
+            {
+                activeGames[gameId].session.player[playerID].momPoints = 2000;
+            }
+        }
+        if(y>2 && y<6)
+        {
+            switch(k)
+            {
+                case "1":
+                    activeGames[gameId].session.player[playerID].momPoints += 700;
+                    validateAsCounted(k, gameId, playerID);
+                    break;
+                case "2":
+                    activeGames[gameId].session.player[playerID].momPoints += 200;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerID].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerID);
+                    break;
+                case "3":
+                    activeGames[gameId].session.player[playerID].momPoints += 300;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerID].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerID);
+                    break;
+                case "4":
+                    activeGames[gameId].session.player[playerID].momPoints += 400;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerID].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerID);
+                    break;
+                case "5":
+                    activeGames[gameId].session.player[playerID].momPoints += 350;
+                    validateAsCounted(k, gameId, playerID);
+                    break;
+                case "6":
+                    activeGames[gameId].session.player[playerID].momPoints += 600;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerID].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerID);
+                    break;
+            }
+        }
+        else if(y==6)
+        {
+            switch(k)
+            {
+                case "1":
+                    activeGames[gameId].session.player[playerID].momPoints = 2000;
+                    break;
+                case "2":
+                    activeGames[gameId].session.player[playerID].momPoints = 400;
+                    break;
+                case "3":
+                    activeGames[gameId].session.player[playerID].momPoints = 600;
+                    break;
+                case "4":
+                    activeGames[gameId].session.player[playerID].momPoints = 800;
+                    break;
+                case "5":
+                    activeGames[gameId].session.player[playerID].momPoints = 1000;
+                    break;
+                case "6":
+                    activeGames[gameId].session.player[playerID].momPoints = 1200;
+                    break;
+            }
+        }
+    }
+}
+
 function validateAsCounted(x, gameId, playerID)
 {
     activeGames[gameId].session.player[playerID].wurfel.forEach(a=>{if(a.hold==true && a.augenzahl==x){a.counted=true}});
