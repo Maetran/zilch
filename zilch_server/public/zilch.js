@@ -328,7 +328,10 @@ socket.on('bankPoints', (submit) => {
     const points = (gameValues.player[playerId].momPoints
         + gameValues.player[playerId].holdPoints);
     const tot = gameValues.player[playerId].totalPoints;
-    if(result==1){
+    if(result==0){
+        alert("Du Schlingel. Du bist nicht dran.");
+    }
+    else if(result==1){
         alert("Schreiben ohne Punkte nicht möglich");
     }
     else if(result==2){

@@ -1,13 +1,16 @@
 const allUsers = new Object();
 const activeGames = new Object();
-module.exports.allUsers = allUsers;
-module.exports.activeGames = activeGames;
+
+// *** Example of game values structure
+    // activeGames = {[gameId]:{"userGameName":gameName,
+    //  "players":[{"name":playerName,"socketId":socketId, "currentPlayer": 0}], "session": gameParams, "gameFull": full/notFull}}
+
 
 module.exports.registerPlayer = function registerPlayer(userName, userId)
 {
     allUsers[userId] = userName;
     return {allUsers, activeGames};
-}
+};
 
 module.exports.createNewGame = function createNewGame(userGameName, userId)
 {
@@ -19,7 +22,7 @@ module.exports.createNewGame = function createNewGame(userGameName, userId)
     const gameParams = {"gameId": gameId, "name": userGameName};
     activeGames[gameId]["gameFull"] = "notFull";
     return {gameParams, activeGames, gameId};
-}
+};
 
 module.exports.joinRequest = function joinRequest(gameId)
 {
@@ -30,7 +33,7 @@ module.exports.joinRequest = function joinRequest(gameId)
             return true;
         }
     }
-}
+};
 
 module.exports.gameFull = function gameFull(gameId, userId)
 {
@@ -42,7 +45,117 @@ module.exports.gameFull = function gameFull(gameId, userId)
     activeGames[gameId].players.push({"name":playerName, "socketId": userId, "currentPlayer":1});
     activeGames[gameId]["gameFull"] = "full";
     const gameValues = init(gameId);
-    return gameValues;
+    return {gameValues, activeGames};
+};
+
+module.exports.requestFirstRoll = function requestFirstRoll(gameId)
+{
+    console.log("*** request first roll *** + " + getCurrentPlayer(gameId));
+    rollUnholdDice(1, gameId);
+    return activeGames[gameId].session;
+};
+
+module.exports.holdDiceChangeRequest = function holdDiceChangeRequest(gameId, diceIndexToHold, userId)
+{
+    const playerId = getCurrentPlayer(gameId);
+    console.log("diceindextohold: " + diceIndexToHold);
+    console.log("gameId: " + gameId)
+    console.log("player id: " + playerId);
+    if(isItMyTurn(gameId, userId))
+    {
+        if(activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].locked != true)
+        {
+            activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].hold = !activeGames[gameId].session.player[playerId].wurfel[diceIndexToHold].hold;
+            const session = activeGames[gameId].session;
+            return {"controller": true, session};
+        }
+    }
+    else
+    {
+        const session = activeGames[gameId].session;
+        return {"controller": false, session};
+    };
+};
+
+module.exports.analyze = function analyze(gameId, userId)
+{
+    if(isItMyTurn(gameId, userId))
+    {
+        calculate(gameId);
+        // activeGames[gameId].session.player[0] // USELESS? IF CODE WORKING, DELETE
+        // return activeGames[gameId].session; // testing if needed, maybe working without else
+    }
+    return activeGames[gameId].session;
+};
+
+module.exports.rollDice = function rollDice(gameId, userId)
+{
+    if(isItMyTurn(gameId, userId)){rollUnholdDice(2, gameId)};
+    return activeGames[gameId].session; 
+};
+
+module.exports.bankThis = function bankThis(gameId, userId)
+{
+    let result = 0;
+    if(isItMyTurn(gameId, userId))
+    {
+        result = bank(gameId);
+    };
+    return {"result":result, "gameValues": activeGames[gameId].session}
+};
+
+module.exports.resetAfterBank = function resetAfterBank(gameId, userId)
+{
+    if(isItMyTurn(gameId, userId))
+    {
+        const playerId = getCurrentPlayer(gameId);
+        activeGames[gameId].session.player[playerId].momPoints = 0;
+        activeGames[gameId].session.player[playerId].holdPoints = 0;
+        activeGames[gameId].session.player[playerId].wurfel
+            .forEach(a=> {a.hold=false;a.locked=false;a.counted=false});
+    };
+    return activeGames[gameId].session;
+};
+
+module.exports.zilchThis = function zilchThis(gameId, userId)
+{
+    if(isItMyTurn(gameId, userId))
+    {
+        const playerId = getCurrentPlayer(gameId);
+        activeGames[gameId].session.player[playerId].momPoints = 0;
+        activeGames[gameId].session.player[playerId].holdPoints = 0;
+        activeGames[gameId].session.player[playerId].durchgang += 1;
+        for(let i=0;i<2;i++)
+        {
+            activeGames[gameId].session.player[i].wurfel
+                .forEach(a=> {a.hold=false;a.locked=false;a.counted=false});
+        }
+        switchCurrentPlayer(gameId);
+    }
+    return activeGames[gameId].session;
+};
+
+module.exports.newRollDice = function newRollDice(gameId, userId)
+{
+    if(isItMyTurn(gameId, userId))
+    {
+        rollUnholdDice(1, gameId);
+    }    
+    return activeGames[gameId].session;
+};
+
+module.exports.leftGame = function leftGame(userId)
+{
+    console.log('User verlassen: ' + allUsers[userId])
+    delete allUsers[userId];
+    const gameName = "game" + userId;
+    if(activeGames[gameName]!=undefined)
+    {
+        console.log("Spiel noch im Dict. drin: " + gameName);
+        delete activeGames[gameName];
+        console.log("Spiel jetzt gelöscht: " + gameName)
+    };
+    return {allUsers, activeGames}
 }
 
 function init(gameId)
@@ -91,19 +204,12 @@ function init(gameId)
     };
     activeGames[gameId].session = gameValues;
     return gameValues;
-}
-
-module.exports.requestFirstRoll = function requestFirstRoll(gameId)
-{
-    console.log("*** request first roll *** + " + getCurrentPlayer(gameId));
-    rollUnholdDice(1, gameId);
-    return activeGames[gameId].session;
-}
+};
 
 function getCurrentPlayer(gameId)
 {
     return activeGames[gameId].session.currentPlayerID;
-}
+};
 
 function rollUnholdDice(x, gameId)
 // function called on game start and eventlistener
@@ -196,4 +302,164 @@ function rollUnholdDice(x, gameId)
             })
         }
     }
-}
+};
+
+function isItMyTurn(gameId, userId)
+{
+    const currentPlayer = getCurrentPlayer(gameId);
+    return activeGames[gameId].session.player[currentPlayer].socketId == userId;
+};
+
+function calculate(gameId)
+// is called any time a dice is selected or unselected and analyzes the mom points
+{
+    console.log("analyze: " + activeGames[gameId].session.currentPlayerID)
+    const playerId = getCurrentPlayer(gameId);
+    activeGames[gameId].session.player[playerId].momPoints = 0;
+    activeGames[gameId].session.player[playerId].nextRollOK = true;
+    const holdDiceWithOccurence = activeGames[gameId].session.player[playerId].wurfel
+        .filter(wurfel=>wurfel.hold)
+        .reduce((holdDiceMap,wurfel)=>{
+            holdDiceMap[wurfel.augenzahl] += 1;
+        return holdDiceMap;
+    },{1:0,2:0,3:0,4:0,5:0,6:0})
+    for(k in holdDiceWithOccurence)
+    {
+        let y = holdDiceWithOccurence[k]; // y for readability - gives the occurence of one specific dice as number
+        switch(k)
+        {
+            case "1":
+                activeGames[gameId].session.player[playerId].momPoints += 100 * y;
+                validateAsCounted(k, gameId, playerId)
+                break;
+            case "5":
+                activeGames[gameId].session.player[playerId].momPoints += 50 * y;
+                validateAsCounted(k, gameId, playerId)
+                break;
+        }
+        if(y!=0)
+        {
+            let holdDice = [];
+            for(let j=0;j<6;j++)
+            {
+                if(activeGames[gameId].session.player[playerId].wurfel[j].hold == true)
+                {
+                    holdDice.push(activeGames[gameId].session.player[playerId].wurfel[j].augenzahl);
+                }
+            }
+
+            let isStreet = [1,2,3,4,5,6].every((val,ind)=>val===holdDice[ind])        // checks if user rolled a straight 1-6 == 2000 points
+
+            if(isStreet)
+            {
+                activeGames[gameId].session.player[playerId].momPoints = 2000;
+            }
+        }
+        if(y>2 && y<6)
+        {
+            switch(k)
+            {
+                case "1":
+                    activeGames[gameId].session.player[playerId].momPoints += 700;
+                    validateAsCounted(k, gameId, playerId);
+                    break;
+                case "2":
+                    activeGames[gameId].session.player[playerId].momPoints += 200;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerId].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerId);
+                    break;
+                case "3":
+                    activeGames[gameId].session.player[playerId].momPoints += 300;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerId].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerId);
+                    break;
+                case "4":
+                    activeGames[gameId].session.player[playerId].momPoints += 400;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerId].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerId);
+                    break;
+                case "5":
+                    activeGames[gameId].session.player[playerId].momPoints += 350;
+                    validateAsCounted(k, gameId, playerId);
+                    break;
+                case "6":
+                    activeGames[gameId].session.player[playerId].momPoints += 600;
+                    if(y==4||y==5){activeGames[gameId].session.player[playerId].nextRollOK = false};
+                    validateAsCounted(k, gameId, playerId);
+                    break;
+            }
+        }
+        else if(y==6)
+        {
+            switch(k)
+            {
+                case "1":
+                    activeGames[gameId].session.player[playerId].momPoints = 2000;
+                    break;
+                case "2":
+                    activeGames[gameId].session.player[playerId].momPoints = 400;
+                    break;
+                case "3":
+                    activeGames[gameId].session.player[playerId].momPoints = 600;
+                    break;
+                case "4":
+                    activeGames[gameId].session.player[playerId].momPoints = 800;
+                    break;
+                case "5":
+                    activeGames[gameId].session.player[playerId].momPoints = 1000;
+                    break;
+                case "6":
+                    activeGames[gameId].session.player[playerId].momPoints = 1200;
+                    break;
+            }
+        }
+    }
+};
+
+function validateAsCounted(x, gameId, playerId)
+{
+    activeGames[gameId].session.player[playerId].wurfel.forEach(a=>{if(a.hold==true && a.augenzahl==x){a.counted=true}});
+};
+
+function bank(gameId)
+{
+    console.log("*** in Bank function ***");
+    console.log("bank funct: " + activeGames[gameId].session.currentPlayerID)
+    let playerId = getCurrentPlayer(gameId);
+    let tot = activeGames[gameId].session.player[playerId].totalPoints;
+    let hold = activeGames[gameId].session.player[playerId].holdPoints;
+    let mom = activeGames[gameId].session.player[playerId].momPoints;
+    if(mom==0)
+    {
+        console.log("Du kannst nicht schreiben ohne erst Punkte zu halten");
+        return 1;
+    }
+    else if((hold+mom)<400)
+    {
+        console.log("Du kannst weniger als 400 Punkte nicht schreiben");
+        return 2;
+    }
+    else
+    {
+        tot += hold + mom;
+        activeGames[gameId].session.player[playerId].totalPoints = tot;
+        if(tot >= 10000)
+        {
+            console.log("Du hast gewonnen, mehr als 10'000 Pkte");
+            tot = 0;
+            return 3;
+        }
+        else
+        {
+            console.log("Punkte werden angeschrieben");
+            activeGames[gameId].session.player[playerId].durchgang += 1;
+            switchCurrentPlayer(gameId);
+            return 4;
+        }
+    }
+};
+
+function switchCurrentPlayer(gameId)
+{
+    activeGames[gameId].session.currentPlayerID = activeGames[gameId].session.currentPlayerID==0 ? 1 : 0;
+};
