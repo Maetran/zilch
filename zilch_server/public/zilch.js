@@ -239,29 +239,7 @@ function applyGameValuesToUi()
             $($("div img")[i]).removeClass("counted")
         };
     }
-        // if(x==1)
-        // is called when player clicks on dice, adds new class to the dice;
-        // needed for analyze
-        // {
-        //     let thisWuerfelHoldBool = gameValues.player[playerID].wurfel[i].hold;
-        //     if(thisWuerfelHoldBool)
-        //     {
-        //         $($("div img")[i]).addClass("hold");
-        //     }
-        //     else if(thisWuerfelHoldBool == false)
-        //     {
-        //         $($("div img")[i]).removeClass("hold");
-        //     }
-        // }
-        // if(x==2)    // is called when reroll unhold dice. x==2 -> adds locked class and removes hold class
-        // {
-        //     let thisWuerfelLockedBool = gameValues.player[playerID].wurfel[i].locked;
-        //     if(thisWuerfelLockedBool)
-        //     {
-        //         $($("div img")[i]).addClass("locked");
-        //         $($("div img")[i]).removeClass("hold");
-        //     }
-        // }
+
         // if(x==3)    // is called when player rolls nothing, all dice are going to be locked, player gains +500 and is allowed to roll next roll;
         // {
         //     for(let i=0; i<6;i++)
@@ -372,6 +350,18 @@ socket.on('newRollOk', (thisRoll) => {
     const activePlayer = thisRoll.currentPlayerID;
     const activePlayerName = thisRoll.player[activePlayer].name;
     $("#spielerName1").text(activePlayerName);
+    if(thisRoll.player[activePlayer].nothing)
+    {
+        console.log("Es wurde NICHTS schlaues gewürfelt");
+        thisRoll.player[activePlayer].momPoints += 500 + thisRoll.player[activePlayer].holdPoints;
+        $("#punkteAnzeige").text(thisRoll.player[activePlayer].momPoints);
+        $("#sondertext").text("Du hast NICHTS gewürfelt. Los - nochmal. Gibt 500 extra Looser Punkte");
+        thisRoll.player[activePlayer].wurfel.forEach(a=>{a.hold=true});
+        console.log(thisRoll.player[activePlayer].wurfel);
+        for(let i=0; i<6;i++){$($("div img")[i]).addClass("hold");}
+        toSessionStorage(thisRoll);
+        applyGameValuesToUi();
+    };
 });
 
 //<------------------------------------------------------------------------>
@@ -388,13 +378,13 @@ socket.on('zilchOk', (thisRoll) => {
     const tot = thisRoll.player[playerId].totalPoints;
     const durchg = thisRoll.player[playerId].durchgang;
     toSessionStorage(thisRoll);
-    console.log(thisRoll.player[playerId].wurfel);
-    console.log(thisRoll.player[playerId2].wurfel);
     applyGameValuesToUi();
     newDicePics();
+    $("spielerName1").text(thisRoll.player[playerId2].name);
     $("#punkteTabelle"+playerId+ " tr:last").after("<tr><td>"
         + durchg + "</td><td> Zilch </td><td>"
         + tot +"</td>");
+    newRoll();
 })
 
 //<------------------------------------------------------------------------>

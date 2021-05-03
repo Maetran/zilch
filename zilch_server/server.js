@@ -94,7 +94,8 @@ io.on('connection', (socket) => {
     // Reqest of reset classes & initial countings for each dice
     socket.on('zilch', (gameId) => {
         const gameValues = zilchThis(gameId, socket.id);
-        io.to(gameId).emit('zilchOk', gameValues);
+        console.log("Game Values = " + gameValues);
+        if(gameValues!=undefined){io.to(gameId).emit('zilchOk', gameValues)};
     });
 
     // Request to switch player
