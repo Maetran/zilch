@@ -19,20 +19,6 @@ socket.on('updatePlayerList', (msg) => {
   location.hash = 'lobby';
 });
 
-socket.on('joinedGame', (gameId) => {
-  console.log("Du bist jetzt im Raum: " + gameId["gameId"] + " " + gameId["name"]);
-  location.hash = 'game';
-  const newLeaveButton = document.createElement('button');
-  newLeaveButton.innerHTML = "Dieses Spiel beenden";
-  newLeaveButton.setAttribute('onclick', 'leaveGame(' + gameId + ')');
-  $('#leaveGameButton').append(newLeaveButton);
-});
-
-socket.on('leftGame', () => {
-  console.log("Du hast das Spiel verlassen, zurück zur Lobby");
-  location.hash = 'lobby';
-});
-
 socket.on('showAllGames', (activeGames) => {
     $('#availableGames').empty();
     for(k in activeGames)
@@ -48,34 +34,19 @@ socket.on('showAllGames', (activeGames) => {
     };
 });
 
-//<------------------------------------------------------------------------>
+socket.on('joinedGame', (gameId) => {
+  console.log("Du bist jetzt im Raum: " + gameId["gameId"] + " " + gameId["name"]);
+  location.hash = 'game';
+  const newLeaveButton = document.createElement('button');
+  newLeaveButton.innerHTML = "Dieses Spiel beenden";
+  newLeaveButton.setAttribute('onclick', 'leaveGame(' + gameId + ')');
+  $('#leaveGameButton').append(newLeaveButton);
+});
 
-function createGame()
-{
-    const userGameName = prompt("Gib deinem Spiel einen Namen:");
-    if(userGameName==null)
-    {
-        console.log("***Abbrechen geklickt***");
-    }
-    else if(userGameName!="")
-    {
-        socket.emit('createNewGame', userGameName);
-    }
-    else
-    {
-        createGame()
-    }
-};
-
-function leaveGame()
-{
-  socket.emit('leaveGame');
-};
-
-function joinThisGame(gameId)
-{
-    socket.emit('joinRequest', gameId);
-}
+socket.on('leftGame', () => {
+  console.log("Du hast das Spiel verlassen, zurück zur Lobby");
+  location.hash = 'lobby';
+});
 
 socket.on('joinRequestAnswer', (gameId) => {
     console.log("Du darfst dem Spiel beitreten: " + gameId);
@@ -95,8 +66,6 @@ socket.on('gameStart', (submit) => {
   socket.emit('requestFirstRoll', submit["gameId"]);
 });
 
-location.hash = '';
-
 socket.on('firstRollToUi', (thisRoll) => {
     const activePlayer = thisRoll.currentPlayerID;
     const activePlayerName = thisRoll.player[activePlayer].name;
@@ -110,6 +79,92 @@ socket.on('firstRollToUi', (thisRoll) => {
     console.log("meine id: " + myId);
     sessionStorage.setItem("myId", myId);
     toSessionStorage(thisRoll);
+});
+
+socket.on('confirmHoldChange', thisRoll => {
+    toSessionStorage(thisRoll);
+    applyGameValuesToUi();
+});
+
+socket.on('itWasCounted', (thisRoll) => {
+    toSessionStorage(thisRoll);
+    let playerID = currentPlayerId();
+    let gameValues = fromSessionStorage();
+    $("#punkteAnzeige").text(gameValues.player[playerID].momPoints+gameValues.player[playerID].holdPoints);
+})
+
+socket.on('unholdDiceRolled', (thisRoll) => {
+    toSessionStorage(thisRoll);
+    newDicePics()
+});
+
+socket.on('bankPoints', (submit) => {
+    const playerId = currentPlayerId(); // Get old player ID to assign new values to table
+    toSessionStorage(submit["gameValues"]);
+    const gameValues = fromSessionStorage();
+    const result = submit["result"];
+    const points = (gameValues.player[playerId].momPoints
+        + gameValues.player[playerId].holdPoints);
+    const tot = gameValues.player[playerId].totalPoints;
+    if(result==0){
+        alert("Du Schlingel. Du bist nicht dran.");
+    }
+    else if(result==1){
+        alert("Schreiben ohne Punkte nicht möglich");
+    }
+    else if(result==2){
+        alert("Weniger als 400 Punkte kann man nicht schreiben");
+    }
+    else if(result==3){
+        alert("Gewonnen, mehr als 10'000 Punkte");
+    }
+    else if(result==4){
+        const durchg = gameValues.player[playerId].durchgang;
+        $("#punkteTabelle"+playerId+ " tr:last").after("<tr><td>"
+            + durchg + "</td><td>" + points + "</td><td>" + tot + "</td>");
+        resetAfterBank();
+    };
+});
+
+socket.on('resetAfterBankOk', (thisRoll) => {
+    toSessionStorage(thisRoll);
+    applyGameValuesToUi();
+    newRoll();
+});
+
+socket.on('newRollOk', (thisRoll) => {
+    toSessionStorage(thisRoll);
+    newDicePics();
+    const activePlayer = thisRoll.currentPlayerID;
+    const activePlayerName = thisRoll.player[activePlayer].name;
+    $("#spielerName1").text(activePlayerName);
+    if(thisRoll.player[activePlayer].nothing)
+    {
+        console.log("Es wurde NICHTS schlaues gewürfelt");
+        thisRoll.player[activePlayer].momPoints += 500 + thisRoll.player[activePlayer].holdPoints;
+        $("#punkteAnzeige").text(thisRoll.player[activePlayer].momPoints);
+        $("#sondertext").text("Du hast NICHTS gewürfelt. Los - nochmal. Gibt 500 extra Looser Punkte");
+        thisRoll.player[activePlayer].wurfel.forEach(a=>{a.hold=true});
+        console.log(thisRoll.player[activePlayer].wurfel);
+        for(let i=0; i<6;i++){$($("div img")[i]).addClass("hold");}
+        toSessionStorage(thisRoll);
+        applyGameValuesToUi();
+    };
+});
+
+socket.on('zilchOk', (thisRoll) => {
+    const playerId = currentPlayerId();
+    const playerId2 = playerId==0 ? 1 : 0;
+    const tot = thisRoll.player[playerId].totalPoints;
+    const durchg = thisRoll.player[playerId].durchgang;
+    toSessionStorage(thisRoll);
+    applyGameValuesToUi();
+    newDicePics();
+    $("spielerName1").text(thisRoll.player[playerId2].name);
+    $("#punkteTabelle"+playerId+ " tr:last").after("<tr><td>"
+        + durchg + "</td><td> Zilch </td><td>"
+        + tot +"</td>");
+    newRoll();
 });
 
 //<------------------------------------------------------------------------>
@@ -160,7 +215,20 @@ function assignNewPic(i, x)
     $("#wuerfel" + counters[i]).attr("src", bilder(x));
 };
 
-//<------------------------------------------------------------------------>
+function myPlayerId()
+{
+    return sessionStorage.getItem("myId");
+};
+
+function currentPlayerId()
+{
+    return JSON.parse(sessionStorage.gameValues).currentPlayerID;
+};
+
+function myGameId()
+{
+    return JSON.parse(sessionStorage.gameValues).gameCode;
+};
 
 function toSessionStorage(thisRoll)
 {
@@ -171,25 +239,6 @@ function fromSessionStorage()
 {
     return JSON.parse(sessionStorage.gameValues)
 }
-
-//<------------------------------------------------------------------------>
-
-function myPlayerId()
-{
-    return sessionStorage.getItem("myId");
-}
-
-function currentPlayerId()
-{
-    return JSON.parse(sessionStorage.gameValues).currentPlayerID;
-}
-
-function myGameId()
-{
-    return JSON.parse(sessionStorage.gameValues).gameCode;
-}
-
-//<------------------------------------------------------------------------>
 
 function holdListener()
 // registers a listener to the document - needed for each click on a dice
@@ -203,12 +252,7 @@ function holdListener()
         const submit = {"gameId": gameId, "diceIndexToHold": diceIndexToHold}
         socket.emit('holdDiceChangeRequest', submit);
     });
-}
-
-socket.on('confirmHoldChange', thisRoll => {
-    toSessionStorage(thisRoll);
-    applyGameValuesToUi();
-});
+};
 
 function applyGameValuesToUi()
 {
@@ -258,15 +302,7 @@ function registerCounterListener()
         const gameId = myGameId();
         socket.emit('analyze', gameId)
     });
-}
-
-socket.on('itWasCounted', (thisRoll) => {
-    toSessionStorage(thisRoll);
-    let playerID = currentPlayerId();
-    let gameValues = fromSessionStorage();
-    $("#punkteAnzeige").text(gameValues.player[playerID].momPoints+gameValues.player[playerID].holdPoints);
-})
-
+};
 
 function registerButtonListener()
 // registers a listener for the buttons and fires events
@@ -277,7 +313,10 @@ function registerButtonListener()
     $("#knopf3").click(() => {zilch()});
 };
 
-//<------------------------------------------------------------------------>
+function joinThisGame(gameId)
+{
+    socket.emit('joinRequest', gameId);
+};
 
 function rollUnholdDice2()
 {
@@ -285,46 +324,11 @@ function rollUnholdDice2()
     socket.emit('rollDice', gameId);
 };
 
-socket.on('unholdDiceRolled', (thisRoll) => {
-    toSessionStorage(thisRoll);
-    newDicePics()
-});
-
-//<------------------------------------------------------------------------>
-
 function bankPoints()
 {
     const gameId = myGameId();
     socket.emit('bankPoints', gameId);
 };
-
-socket.on('bankPoints', (submit) => {
-    const playerId = currentPlayerId(); // Get old player ID to assign new values to table
-    toSessionStorage(submit["gameValues"]);
-    const gameValues = fromSessionStorage();
-    const result = submit["result"];
-    const points = (gameValues.player[playerId].momPoints
-        + gameValues.player[playerId].holdPoints);
-    const tot = gameValues.player[playerId].totalPoints;
-    if(result==0){
-        alert("Du Schlingel. Du bist nicht dran.");
-    }
-    else if(result==1){
-        alert("Schreiben ohne Punkte nicht möglich");
-    }
-    else if(result==2){
-        alert("Weniger als 400 Punkte kann man nicht schreiben");
-    }
-    else if(result==3){
-        alert("Gewonnen, mehr als 10'000 Punkte");
-    }
-    else if(result==4){
-        const durchg = gameValues.player[playerId].durchgang;
-        $("#punkteTabelle"+playerId+ " tr:last").after("<tr><td>"
-            + durchg + "</td><td>" + points + "</td><td>" + tot + "</td>");
-        resetAfterBank();
-    };
-});
 
 function resetAfterBank()
 {
@@ -332,39 +336,11 @@ function resetAfterBank()
     socket.emit('resetAfterBank', gameId);
 };
 
-socket.on('resetAfterBankOk', (thisRoll) => {
-    toSessionStorage(thisRoll);
-    applyGameValuesToUi();
-    newRoll();
-});
-
 function newRoll()
 {
     const gameId = myGameId();
     socket.emit('newRoll', gameId);
 };
-
-socket.on('newRollOk', (thisRoll) => {
-    toSessionStorage(thisRoll);
-    newDicePics();
-    const activePlayer = thisRoll.currentPlayerID;
-    const activePlayerName = thisRoll.player[activePlayer].name;
-    $("#spielerName1").text(activePlayerName);
-    if(thisRoll.player[activePlayer].nothing)
-    {
-        console.log("Es wurde NICHTS schlaues gewürfelt");
-        thisRoll.player[activePlayer].momPoints += 500 + thisRoll.player[activePlayer].holdPoints;
-        $("#punkteAnzeige").text(thisRoll.player[activePlayer].momPoints);
-        $("#sondertext").text("Du hast NICHTS gewürfelt. Los - nochmal. Gibt 500 extra Looser Punkte");
-        thisRoll.player[activePlayer].wurfel.forEach(a=>{a.hold=true});
-        console.log(thisRoll.player[activePlayer].wurfel);
-        for(let i=0; i<6;i++){$($("div img")[i]).addClass("hold");}
-        toSessionStorage(thisRoll);
-        applyGameValuesToUi();
-    };
-});
-
-//<------------------------------------------------------------------------>
 
 function zilch()
 {
@@ -372,25 +348,29 @@ function zilch()
     socket.emit('zilch', gameId);
 };
 
-socket.on('zilchOk', (thisRoll) => {
-    const playerId = currentPlayerId();
-    const playerId2 = playerId==0 ? 1 : 0;
-    const tot = thisRoll.player[playerId].totalPoints;
-    const durchg = thisRoll.player[playerId].durchgang;
-    toSessionStorage(thisRoll);
-    applyGameValuesToUi();
-    newDicePics();
-    $("spielerName1").text(thisRoll.player[playerId2].name);
-    $("#punkteTabelle"+playerId+ " tr:last").after("<tr><td>"
-        + durchg + "</td><td> Zilch </td><td>"
-        + tot +"</td>");
-    newRoll();
-})
+function createGame()
+{
+    const userGameName = prompt("Gib deinem Spiel einen Namen:");
+    if(userGameName==null)
+    {
+        console.log("***Abbrechen geklickt***");
+    }
+    else if(userGameName!="")
+    {
+        socket.emit('createNewGame', userGameName);
+    }
+    else
+    {
+        createGame()
+    }
+};
+
+function leaveGame()
+{
+  socket.emit('leaveGame');
+};
 
 //<------------------------------------------------------------------------>
 
-
-//<------------------------------------------------------------------------>
-
-
+location.hash = '';
 
