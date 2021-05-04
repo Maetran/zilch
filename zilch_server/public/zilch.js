@@ -67,6 +67,7 @@ socket.on('gameStart', (submit) => {
 });
 
 socket.on('firstRollToUi', (thisRoll) => {
+    toSessionStorage(thisRoll);
     const activePlayer = thisRoll.currentPlayerID;
     const activePlayerName = thisRoll.player[activePlayer].name;
     $("#spielerName1").text(activePlayerName);
@@ -75,10 +76,18 @@ socket.on('firstRollToUi', (thisRoll) => {
         let dice = thisRoll.player[activePlayer].wurfel[i].augenzahl;
         assignNewPic(i, dice);
     };
+    if(thisRoll.player[activePlayer].nothing)
+    {
+        $("#punkteAnzeige").text(thisRoll.player[activePlayer].momPoints+thisRoll.player[activePlayer].holdPoints);
+        $("#sondertext").text("Du hast NICHTS gewürfelt. Los - nochmal. Gibt 500 extra Looser Punkte");
+        toSessionStorage(thisRoll);
+        applyGameValuesToUi();
+    };
     let myId = socket.id==thisRoll.player[0].socketId ? 0 : 1;
     console.log("meine id: " + myId);
     sessionStorage.setItem("myId", myId);
-    toSessionStorage(thisRoll);
+    if(socket.id!=thisRoll.player[activePlayer].socketId){$('#knopf1, #knopf2, #knopf3').hide()}
+    else{$('#knopf1, #knopf2, #knopf3').show()};
 });
 
 socket.on('confirmHoldChange', thisRoll => {
@@ -95,6 +104,7 @@ socket.on('itWasCounted', (thisRoll) => {
 
 socket.on('unholdDiceRolled', (thisRoll) => {
     toSessionStorage(thisRoll);
+    $("#sondertext").text("");
     newDicePics()
 });
 
@@ -129,6 +139,7 @@ socket.on('bankPoints', (submit) => {
 socket.on('resetAfterBankOk', (thisRoll) => {
     toSessionStorage(thisRoll);
     applyGameValuesToUi();
+    $("#sondertext").text("");
     newRoll();
 });
 
@@ -140,7 +151,6 @@ socket.on('newRollOk', (thisRoll) => {
     $("#spielerName1").text(activePlayerName);
     if(thisRoll.player[activePlayer].nothing)
     {
-        console.log("Es wurde NICHTS schlaues gewürfelt");
         thisRoll.player[activePlayer].momPoints += 500 + thisRoll.player[activePlayer].holdPoints;
         $("#punkteAnzeige").text(thisRoll.player[activePlayer].momPoints);
         $("#sondertext").text("Du hast NICHTS gewürfelt. Los - nochmal. Gibt 500 extra Looser Punkte");
@@ -150,6 +160,8 @@ socket.on('newRollOk', (thisRoll) => {
         toSessionStorage(thisRoll);
         applyGameValuesToUi();
     };
+    if(socket.id!=thisRoll.player[activePlayer].socketId){$('#knopf1, #knopf2, #knopf3').hide()}
+    else{$('#knopf1, #knopf2, #knopf3').show()};
 });
 
 socket.on('zilchOk', (thisRoll) => {
@@ -164,6 +176,7 @@ socket.on('zilchOk', (thisRoll) => {
     $("#punkteTabelle"+playerId+ " tr:last").after("<tr><td>"
         + durchg + "</td><td> Zilch </td><td>"
         + tot +"</td>");
+    $("#sondertext").text("");
     newRoll();
 });
 
@@ -283,15 +296,6 @@ function applyGameValuesToUi()
             $($("div img")[i]).removeClass("counted")
         };
     }
-
-        // if(x==3)    // is called when player rolls nothing, all dice are going to be locked, player gains +500 and is allowed to roll next roll;
-        // {
-        //     for(let i=0; i<6;i++)
-        //     {
-        //         $($("div img")[i]).addClass("hold");
-        //     }
-        // }
-    // }
 };
 
 function registerCounterListener()

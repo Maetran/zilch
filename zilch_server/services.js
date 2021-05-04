@@ -194,50 +194,43 @@ function rollUnholdDice(x, gameId)
     console.log(activeGames);
     console.log(activeGames[gameId].session);
     console.log(activeGames[gameId].session.player[0]);
-    activeGames[gameId].session.player[playerId].nothing = false;
     if(x==1)
     //new set of 6 dice
     {
-        console.log("*** im rollunhold(1) ***")
+        if(activeGames[gameId].session.player[playerId].nothing)
+        {
+            activeGames[gameId].session.player[playerId].wurfel.forEach(a=>{a.hold=false});
+        }
+        activeGames[gameId].session.player[playerId].nothing = false;
         for(let i=0; i<6; i++)
         {
             let newWuerfel = parseInt(Math.random() * 6 + 1);
             activeGames[gameId].session.player[playerId].wurfel[i].augenzahl = newWuerfel;
         }
 
-        // FOR TESTING 
-        activeGames[gameId].session.player[0].wurfel[0].augenzahl = 2;
-        activeGames[gameId].session.player[0].wurfel[1].augenzahl = 2;
-        activeGames[gameId].session.player[0].wurfel[2].augenzahl = 3;
-        activeGames[gameId].session.player[0].wurfel[3].augenzahl = 3;
-        activeGames[gameId].session.player[0].wurfel[4].augenzahl = 4;
-        activeGames[gameId].session.player[0].wurfel[5].augenzahl = 4;
-        // END OF TESTING
+        //check if first roll has nothing: no 1, no 5 and no dice occures more than 2x
+        let has1or5 = activeGames[gameId].session.player[playerId].wurfel.some(a=>[1,5].includes(a.augenzahl));
+        // checks if the first roll does not contain 1 and/or 5.
+        if(has1or5==false)
+        {
+            let holdList = [];
+            let helperList = [];
+            activeGames[gameId].session.player[playerId].wurfel.forEach(a=>{holdList.push(a.augenzahl)});
+            for(let i=1;i<7;i++)
+            {
+                helperList.push(holdList.filter(a=>a==i).length)
+            }
+            let has3idents = helperList.some(a=>[3,4,5,6].includes(a));
+            if(!has3idents)
+            {
+                activeGames[gameId].session.player[playerId].wurfel.forEach(a=>{a.hold=true});
+                activeGames[gameId].session.player[playerId].nothing = true;
+                activeGames[gameId].session.player[playerId].momPoints = 500;
+                console.log("nothing: " + activeGames[gameId].session.player[playerId].nothing);
+            }
+        }
+    }
 
-    }
-    //check if first roll has nothing: no 1, no 5 and no dice occures more than 2x
-    let has1or5 = activeGames[gameId].session.player[playerId].wurfel.some(a=>[1,5].includes(a.augenzahl));
-    // checks if the first roll does not contain 1 and/or 5.
-    if(has1or5==false)
-    {
-        let holdList = [];
-        let helperList = [];
-        activeGames[gameId].session.player[playerId].wurfel.forEach(a=>{holdList.push(a.augenzahl)});
-        for(let i=1;i<7;i++)
-        {
-            helperList.push(holdList.filter(a=>a==i).length)
-        }
-        let has3idents = helperList.some(a=>[3,4,5,6].includes(a));
-        if(!has3idents)
-        {
-            activeGames[gameId].session.player[playerId].nothing = true;
-            // applyGameValuesToUi(3);
-            // activeGames[gameId].player[playerId].momPoints += 500 + activeGames[gameId].player[playerId].holdPoints;
-            // $("#punkteAnzeige").text(activeGames[gameId].player[playerId].momPoints);
-            // $("#sondertext").text("Du hast NICHTS gewürfelt. Los - nochmal. Gibt 500 extra Looser Punkte");
-        }
-    }
-    
     if(x==2)
     // called after click on roll button
     {
@@ -246,28 +239,41 @@ function rollUnholdDice(x, gameId)
         let holdLockedCounter = 0;
         activeGames[gameId].session.player[playerId].wurfel.forEach(a=>(a.hold==true ? holdLockedCounter += 1 : 0));
         activeGames[gameId].session.player[playerId].wurfel.forEach(a=>(a.locked==true ? holdLockedCounter += 1 : 0));
-        if(activeGames[gameId].session.player[playerId].nextRollOK != true)
+        if(activeGames[gameId].session.player[playerId].nothing)
         {
+            console.log("kein punktewürfel gefwürfelt");
+            console.log("mompoints: " + activeGames[gameId].session.player[playerId].momPoints);
+            activeGames[gameId].session.player[playerId].holdPoints += activeGames[gameId].session.player[playerId].momPoints;
+            rollUnholdDice(4, gameId);
+        }
+        else if(activeGames[gameId].session.player[playerId].nextRollOK != true)
+        {
+            console.log("nextRollOK == false; von einem würfel werden 4 oder 5 gleiche gehalten, das gibt keine punkte");
             activeGames[gameId].session.player[playerId].wurfel.forEach(a=>{if(a.hold==true&&a.counted==true){a.counted==false}});
             return;
         }
         else if(validator.includes("stop"))
         {
+            console.log("validator auf stop // validator unklar");
             return;
         }
-        else if(activeGames[gameId].session.player[playerId].wurfel.every(a=>a.hold==false)||activeGames[gameId].session.player[playerId].momPoints==0)    // checks if any dice is on hold
+        else if(activeGames[gameId].session.player[playerId].wurfel.every(a=>a.hold==false)||
+            activeGames[gameId].session.player[playerId].momPoints==0)    // checks if any dice is on hold
         {
+            console.log("kein würfel auf hold");
             return;
         }
         else if(holdLockedCounter==6)
         {
+            console.log("alle würfel gehalten und/oder gelockt, neuer wurf mit 6 würfeln ausgelöst");
             activeGames[gameId].session.player[playerId].holdPoints += activeGames[gameId].session.player[playerId].momPoints;
             activeGames[gameId].session.player[playerId].wurfel.forEach(a=> {a.hold=false;a.locked=false});
-            rollUnholdDice(1, gameId); // TODO, think is not working atm
+            rollUnholdDice(1, gameId);
             return;
         }
         else
         {
+            console.log("weiterwürfeln ok, neue würfelwerte vergeben, umstellen von  hold/false auf locked/true");
             activeGames[gameId].session.player[playerId].holdPoints += activeGames[gameId].session.player[playerId].momPoints;
             activeGames[gameId].session.player[playerId].momPoints = 0;
             (activeGames[gameId].session.player[playerId].wurfel).forEach((a,i) => {
@@ -296,6 +302,11 @@ function calculate(gameId)
 {
     console.log("analyze: " + activeGames[gameId].session.currentPlayerID)
     const playerId = getCurrentPlayer(gameId);
+    if(activeGames[gameId].session.player[playerId].nothing)
+    {
+        activeGames[gameId].session.player[playerId].holdPoints
+            += activeGames[gameId].session.player[playerId].momPoints
+    }
     activeGames[gameId].session.player[playerId].momPoints = 0;
     activeGames[gameId].session.player[playerId].nextRollOK = true;
     const holdDiceWithOccurence = activeGames[gameId].session.player[playerId].wurfel
@@ -306,7 +317,8 @@ function calculate(gameId)
     },{1:0,2:0,3:0,4:0,5:0,6:0})
     for(k in holdDiceWithOccurence)
     {
-        let y = holdDiceWithOccurence[k]; // y for readability - gives the occurence of one specific dice as number
+        let y = holdDiceWithOccurence[k]; // y for readability -> 
+            // gives the occurence of one specific dice as number
         switch(k)
         {
             case "1":
@@ -330,9 +342,10 @@ function calculate(gameId)
             }
 
             let isStreet = [1,2,3,4,5,6].every((val,ind)=>val===holdDice[ind])        // checks if user rolled a straight 1-6 == 2000 points
-
+            console.log("isStreet: " + isStreet);
             if(isStreet)
             {
+                activeGames[gameId].session.player[playerId].wurfel.forEach(a=>{a.counted=true});
                 activeGames[gameId].session.player[playerId].momPoints = 2000;
             }
         }
