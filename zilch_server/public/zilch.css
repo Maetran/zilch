@@ -1,4 +1,4 @@
-.upperStuff 
+.upperStuff
 {
     display: flex;
     padding: 10px;
@@ -51,6 +51,14 @@
     margin: 10px;
 }
 
+.playerList
+{
+  height: 400px;
+  position: auto;
+  border: 3px solid rgb(20, 20, 0);
+  width: auto;
+  margin: 10px;
+}
 
 #punkteTabelle
 {
@@ -94,4 +102,33 @@ img.locked
 div img:hover
 {
 filter:invert(0.16)
+}
+
+.page {
+    height: 100vh;
+}
+
+div#nameDiv
+{
+    text-align: center;
+    margin: 0;
+    position: absolute;
+    top: 50%;
+    transform: translate(0, -50%)
+ }
+
+div#lobby
+{
+    text-align: center;
+    margin: 0;
+    position: absolute;
+    top: 50%;
+}
+
+div#mainGame
+{
+    text-align: center;
+    margin: 0;
+    position: absolute;
+    top: 50%;
 }
