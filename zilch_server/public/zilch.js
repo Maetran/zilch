@@ -116,17 +116,22 @@ socket.on('bankPoints', (submit) => {
     const points = (gameValues.player[playerId].momPoints
         + gameValues.player[playerId].holdPoints);
     const tot = gameValues.player[playerId].totalPoints;
+    const myId = myPlayerId();
     if(result==0){
-        alert("Du Schlingel. Du bist nicht dran.");
+            alert("Du Schlingel. Du bist nicht dran.");
     }
     else if(result==1){
+        if(myId==playerId){    
         alert("Schreiben ohne Punkte nicht möglich");
+        }
     }
     else if(result==2){
+        if(myId==playerId){    
         alert("Weniger als 400 Punkte kann man nicht schreiben");
+        }
     }
     else if(result==3){
-        alert("Gewonnen, mehr als 10'000 Punkte");
+        alert(gameValues.player[playerId].name + " hat gewonnen, mehr als 10'000 Punkte");
     }
     else if(result==4){
         const durchg = gameValues.player[playerId].durchgang;
